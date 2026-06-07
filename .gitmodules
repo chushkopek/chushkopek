@@ -1,0 +1,3 @@
+[submodule "slack-alerting"]
+	path = slack-alerting
+	url = https://github.com/chushkopek/slack-alerting
