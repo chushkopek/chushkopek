@@ -20,11 +20,80 @@ reversible guardrails and treats a clean escalation as success, not failure.
 cd agent
 npm install
 cp .env.example .env
-# add ANTHROPIC_API_KEY or OPENAI_API_KEY to .env
 ```
 
-The provider is auto-detected from whichever API key is present (Anthropic is
-preferred). Pin it explicitly with `MODEL_PROVIDER` / `MODEL_ID` if you prefer.
+Add a model API key to `.env`. The provider is auto-detected from whichever key
+is present (detection order: anthropic > openrouter > openai).
+
+**Using OpenRouter (recommended):**
+
+```ini
+OPENROUTER_API_KEY=sk-or-...
+# Optional — defaults to anthropic/claude-opus-4.8:
+# MODEL_ID=anthropic/claude-opus-4.8
+```
+
+OpenRouter model ids are namespaced (`vendor/model`), e.g. `anthropic/claude-sonnet-4.6`,
+`openai/gpt-4o`. Quick model switches without editing `.env`:
+
+```bash
+npm run dev:opus    # anthropic/claude-opus-4.8 via OpenRouter
+npm run dev:sonnet  # anthropic/claude-sonnet-4.6 via OpenRouter
+```
+
+## Actually running the GitHub integration end to end
+
+The `github-issue` subagent files real issues by giving the model a `bash` tool
+in a hardened **podman sandbox** where `gh` is pre-authenticated. Follow these
+steps once and you can file issues for real.
+
+### 1. Prerequisites
+
+- **podman** on PATH (`podman --version`). The sandbox image is auto-pulled on
+first use — no image to build.
+- A model key in `.env` (above).
+
+### 2. Create a GitHub App (one time)
+
+1. Go to **Settings → Developer settings → GitHub Apps → New GitHub App**
+  (for an org: `https://github.com/organizations/<ORG>/settings/apps/new`).
+2. Set any name and homepage URL. Uncheck **Webhook → Active**.
+3. Under **Repository permissions**, set **Issues: Read and write**. (That's all
+  this subagent needs.) Leave everything else default.
+4. Create the App, then on its page click **Generate a private key** — this
+  downloads a `.pem` file.
+5. Note the **App ID** (shown at the top of the App's General page).
+6. Click **Install App** in the sidebar and install it on the repo(s) you want
+  to file issues into (choose "Only select repositories").
+
+### 3. Configure `.env`
+
+```ini
+GITHUB_APP_ID=123456
+GITHUB_APP_PRIVATE_KEY_PATH=./secrets/app.private-key.pem
+# Or paste the PEM inline instead of a path (literal \n newlines are accepted):
+# GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+```
+
+### 4. Verify everything with the doctor
+
+```bash
+npm run doctor                                   # model + podman + sandbox
+npm run doctor -- --owner <owner> --repo <repo>  # also mints a token & hits the repo
+```
+
+Every line should read `PASS` (or an intentional `SKIP`).
+
+### 5. File a real issue with a real model
+
+```bash
+npm run file-issue -- --owner <owner> --repo <repo> \
+  --context "api-gateway 5xx spike after deploy abc123; pods crashlooping"
+```
+
+Other flags: `--context-file <path>`, `--severity sev2`, `--labels incident,bug`.
+With no `--context`, a clearly-marked sample incident is used. The created issue
+URL is printed at the end.
 
 ## Run
 
@@ -94,6 +163,9 @@ src/
   tools/
     index.ts      Core tool registry
     escalate.ts   Terminal escalation tool (produces the EscalationReport)
+  github/         GitHub App auth: mint short-lived, repo-scoped tokens
+  sandbox/        Podman sandbox + a `bash` tool that runs inside it
+  scripts/        doctor (preflight) + file-issue (e2e GitHub test)
   subagents/      Subagent framework + one folder per subagent
     types.ts      The Subagent contract
     runtime.ts    runLlmSubagent() helper (child agent loop)
@@ -120,6 +192,6 @@ See **[docs/subagents.md](docs/subagents.md)** to author one.
 
 ## Roadmap
 
-- **Next:** GitHub access tools — a token-backed `GitHubClient` (read
-  repos/issues/PRs/Actions, open issues). The `github-issue` subagent already
-  consumes this behind an interface; today it uses a stub client.
+- Broaden the sandboxed `gh` capability into a general GitHub subagent (read
+repos/issues/PRs/Actions) reusing `src/github` + `src/sandbox`.
+

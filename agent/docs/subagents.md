@@ -102,8 +102,12 @@ block teammates.
 - **Make terminal tools `terminate: true`** so the loop stops once the job is done.
 - **Throw on tool failure** (don't return errors as content) — the loop reports
   them to the LLM as tool errors.
-- **Stub external access you don't own yet** behind an interface so the chain
-  stays runnable (see `github-issue/github-client.ts`).
+- **Degrade gracefully when external access isn't configured** — return a clear
+  `summary` saying so rather than fabricating a result (see how `github-issue`
+  reports "not configured" when no GitHub App is set up).
+- **Reuse shared infrastructure.** Cross-cutting capabilities live outside the
+  subagent folders: `src/github/` (GitHub App auth) and `src/sandbox/` (podman
+  sandbox + a `bash` tool). The `github-issue` subagent composes both.
 
 ## Testing your subagent
 

@@ -5,6 +5,8 @@ dist/
 # Local secrets / runtime config
 .env
 .env.local
+secrets/
+*.pem
 
 # Incident artifacts written at runtime
 escalations/
