@@ -9,7 +9,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { loadConfig, getApiKey } from "../config.js";
-import { PodmanSandbox } from "../sandbox/index.js";
+import { createSandbox, isPodmanAvailable } from "../sandbox/index.js";
+import type { Sandbox } from "../sandbox/index.js";
 import {
   loadGitHubAppConfigFromEnv,
   mintInstallationToken,
@@ -103,41 +104,45 @@ async function checkModel(): Promise<void> {
 }
 
 async function checkPodman(): Promise<boolean> {
-  console.log("\n[2/4] podman");
-  try {
-    const { stdout } = await execFileAsync("podman", ["--version"]);
-    pass(stdout.trim());
-    return true;
-  } catch (e) {
-    fail(
-      `podman not runnable: ${errMsg(e)}`,
-      "Install podman and ensure it is on PATH (https://podman.io/docs/installation).",
-    );
-    return false;
+  console.log("\n[2/4] Execution environment");
+  if (await isPodmanAvailable()) {
+    try {
+      const { stdout } = await execFileAsync("podman", ["--version"]);
+      pass(`podman available: ${stdout.trim()}`);
+      return true;
+    } catch (e) {
+      skip(`podman found but not runnable (${errMsg(e)}); will use host shell.`);
+      return false;
+    }
   }
+  skip("podman not on PATH; will use host shell (requires gh + git on the host).");
+  return false;
 }
 
-async function checkSandbox(podmanOk: boolean): Promise<void> {
-  console.log("\n[3/4] Sandbox image (gh + git)");
-  if (!podmanOk) {
-    skip("podman unavailable; skipping sandbox check.");
-    return;
-  }
+async function checkSandbox(_podmanOk: boolean): Promise<void> {
+  console.log("\n[3/4] Sandbox (gh + git)");
   const image = process.env.GITHUB_SANDBOX_IMAGE?.trim() || DEFAULT_SANDBOX_IMAGE;
-  info(`Using image ${image} (the first run pulls it; this can take a moment).`);
-  let sandbox: PodmanSandbox | undefined;
+  let sandbox: Sandbox | undefined;
+  let mode: "podman" | "raw" | undefined;
   try {
-    sandbox = await PodmanSandbox.start({
+    ({ sandbox, mode } = await createSandbox({
       image,
-      env: { HOME: "/tmp", GH_CONFIG_DIR: "/tmp/gh" },
-    });
+      env: { GH_PROMPT_DISABLED: "1", GH_NO_UPDATE_NOTIFIER: "1" },
+    }));
+    if (mode === "podman") {
+      info(`Using podman image ${image} (the first run pulls it; this can take a moment).`);
+    } else {
+      info("Using host shell fallback (gh and git must be on PATH).");
+    }
     const r = await sandbox.exec("gh --version | head -1; git --version");
     if (r.exitCode === 0 && /gh version/.test(r.stdout)) {
-      pass(`Sandbox OK: ${r.stdout.trim().replace(/\n/g, " | ")}`);
+      pass(`Sandbox OK (${mode}): ${r.stdout.trim().replace(/\n/g, " | ")}`);
     } else {
       fail(
         `Sandbox started but gh/git not found (exit ${r.exitCode}).`,
-        "Pick an image bundling gh+git via GITHUB_SANDBOX_IMAGE.",
+        mode === "podman"
+          ? "Pick an image bundling gh+git via GITHUB_SANDBOX_IMAGE."
+          : "Install gh and git on the host, or install podman to use the container sandbox.",
       );
     }
   } catch (e) {
@@ -148,7 +153,7 @@ async function checkSandbox(podmanOk: boolean): Promise<void> {
 }
 
 async function checkGitHubApp(
-  podmanOk: boolean,
+  _podmanOk: boolean,
   owner?: string,
   repo?: string,
 ): Promise<void> {
@@ -181,7 +186,7 @@ async function checkGitHubApp(
     return;
   }
 
-  let sandbox: PodmanSandbox | undefined;
+  let sandbox: Sandbox | undefined;
   try {
     const token = await mintInstallationToken(config, {
       owner,
@@ -197,13 +202,9 @@ async function checkGitHubApp(
         (token.expiresAt ? ` (expires ${token.expiresAt})` : ""),
     );
 
-    if (!podmanOk) {
-      skip("podman unavailable; cannot verify token via gh.");
-      return;
-    }
     const image =
       process.env.GITHUB_SANDBOX_IMAGE?.trim() || DEFAULT_SANDBOX_IMAGE;
-    sandbox = await PodmanSandbox.start({
+    ({ sandbox } = await createSandbox({
       image,
       env: {
         GH_TOKEN: token.token,
@@ -212,7 +213,8 @@ async function checkGitHubApp(
         GH_CONFIG_DIR: "/tmp/gh",
         GH_PAGER: "cat",
       },
-    });
+    }));
+    const repoDir = `${sandbox.scratchDir}/repo`;
     const r = await sandbox.exec(
       `gh repo view ${owner}/${repo} --json nameWithOwner -q .nameWithOwner`,
     );
@@ -230,7 +232,7 @@ async function checkGitHubApp(
     // The github subagent operates from a checkout, so verify a clone works
     // with the minted token (contents: read/write).
     const clone = await sandbox.exec(
-      `gh auth setup-git && gh repo clone ${owner}/${repo} /tmp/repo -- --depth 1 && git -C /tmp/repo rev-parse --short HEAD`,
+      `gh auth setup-git && gh repo clone ${owner}/${repo} ${repoDir} -- --depth 1 && git -C ${repoDir} rev-parse --short HEAD`,
     );
     if (clone.exitCode === 0) {
       pass(`Cloned ${owner}/${repo} into the sandbox (HEAD ${clone.stdout.trim().split("\n").pop()}).`);

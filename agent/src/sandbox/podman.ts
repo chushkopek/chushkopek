@@ -16,48 +16,14 @@
  *   - Commands run via `sh -c` (the default image is Alpine/busybox, no bash).
  */
 import { execFile } from "node:child_process";
+import type {
+  ExecOptions,
+  ExecResult,
+  Sandbox,
+  SandboxOptions,
+} from "./types.js";
 
-export interface SandboxOptions {
-  /** Container image to run. Auto-pulled by podman on first use. */
-  image: string;
-  /** Environment variables available to every `exec` in the container. */
-  env?: Record<string, string>;
-  /** Memory cap, passed to `--memory`. Defaults to "512m". */
-  memory?: string;
-  /** Process cap, passed to `--pids-limit`. Defaults to 100. */
-  pidsLimit?: number;
-  /**
-   * Size of the writable `/tmp` tmpfs scratch. Defaults to "64m". Bump it when
-   * the workload needs disk (e.g. cloning a repo into the sandbox).
-   */
-  tmpfsSize?: string;
-  /**
-   * Entrypoint used to keep the container alive. Some images (e.g. maniator/gh)
-   * set an entrypoint that exits immediately, so we override it. Defaults to
-   * `sleep` with arg `infinity`.
-   */
-  keepAlive?: { entrypoint: string; args: string[] };
-}
-
-export interface ExecResult {
-  stdout: string;
-  stderr: string;
-  /** Exit code, or `undefined` if the process was killed by a signal. */
-  exitCode: number | undefined;
-}
-
-export interface ExecOptions {
-  /** Abort the command (kills the `podman exec` process). */
-  signal?: AbortSignal;
-  /** Cap on combined stdout+stderr captured per command (bytes). */
-  maxBuffer?: number;
-  /**
-   * Working directory inside the container (`podman exec -w`). Each `exec` is an
-   * independent `sh -c`, so `cd` does not persist between calls — set this to
-   * run from a fixed directory (e.g. a cloned repo root).
-   */
-  workdir?: string;
-}
+export type { SandboxOptions, ExecResult, ExecOptions } from "./types.js";
 
 interface RawRun {
   stdout: string;
@@ -95,7 +61,10 @@ function runPodman(
   });
 }
 
-export class PodmanSandbox {
+export class PodmanSandbox implements Sandbox {
+  /** Writable tmpfs mount inside the container. */
+  readonly scratchDir = "/tmp";
+
   private containerId: string | undefined;
 
   private constructor(containerId: string) {

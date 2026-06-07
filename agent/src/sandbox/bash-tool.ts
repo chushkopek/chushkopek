@@ -1,5 +1,5 @@
 /**
- * A `bash`-style tool that executes commands inside a {@link PodmanSandbox}.
+ * A `bash`-style tool that executes commands inside a {@link Sandbox}.
  *
  * The hypothesis behind this design: models are heavily trained on driving the
  * `gh` CLI, so rather than hand-rolling REST calls we hand the model a shell in
@@ -9,7 +9,7 @@
  */
 import { Type, type Static } from "@earendil-works/pi-ai";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import type { PodmanSandbox } from "./podman.js";
+import type { Sandbox } from "./types.js";
 
 const BashParams = Type.Object({
   command: Type.String({
@@ -53,7 +53,7 @@ function truncate(text: string, max: number): { text: string; truncated: boolean
 
 /** Build a `bash` tool bound to a specific sandbox. */
 export function createBashTool(
-  sandbox: PodmanSandbox,
+  sandbox: Sandbox,
   options: CreateBashToolOptions = {},
 ): AgentTool<typeof BashParams, BashToolDetails> {
   const maxOutputChars = options.maxOutputChars ?? 16000;
