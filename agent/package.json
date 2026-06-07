@@ -20,6 +20,7 @@
     "start": "node dist/cli.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "doctor": "tsx src/scripts/doctor.ts",
+    "gather": "tsx src/scripts/gather.ts",
     "file-issue": "tsx src/scripts/file-issue.ts"
   },
   "dependencies": {
