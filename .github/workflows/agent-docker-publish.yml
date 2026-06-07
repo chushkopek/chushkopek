@@ -35,7 +35,7 @@ jobs:
           context: ./agent
           file: ./agent/Dockerfile
           push: false
-          tags: l1-agent:ci
+          tags: chushkopek-agent:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -51,7 +51,7 @@ jobs:
         if: env.DOCKERHUB_USERNAME != ''
         uses: docker/metadata-action@v5
         with:
-          images: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/l1-agent
+          images: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/chushkopek-agent
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}

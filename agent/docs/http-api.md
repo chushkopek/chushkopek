@@ -125,7 +125,7 @@ npm run serve                 # http://localhost:8000
 npm run build && npm run serve:prod
 
 # container (see ../Dockerfile) — listens on :8000, use /healthz for probes
-docker build -t l1-agent ./agent && docker run -p 8000:8000 --env-file agent/.env l1-agent
+docker build -t chushkopek-agent ./agent && docker run -p 8000:8000 --env-file agent/.env chushkopek-agent
 ```
 
 ## Notes
