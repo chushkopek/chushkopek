@@ -20,6 +20,7 @@ not load.
 ---
 
 ## 1. Grafana context — Mitko
+
 **File:** [src/context/providers/grafana/index.ts](../src/context/providers/grafana/index.ts)
 **Replace:** `createStubGrafanaSource()` → a real Grafana/Prometheus client.
 **Keep:** the `GrafanaSlice` payload shape (or extend it) and the `provider` object.
@@ -28,6 +29,7 @@ metrics for the failing service, scoped to the incident window; `status:"error"`
 on query failure; `simulated` dropped.
 
 ## 2. GitHub context — Bojo
+
 **File:** [src/context/providers/github/index.ts](../src/context/providers/github/index.ts)
 **Replace:** `createStubGithubSource()` → real GitHub data via the shared auth +
 sandbox stack in [src/github/](../src/github/) (`mintInstallationToken`) and
@@ -38,6 +40,7 @@ sandbox stack in [src/github/](../src/github/) (`mintInstallationToken`) and
 and routes PagerDuty.
 
 ## 3. App-usage/World context — Kalata
+
 **File:** [src/context/providers/usage/index.ts](../src/context/providers/usage/index.ts)
 **Replace:** `createStubUsageSource()` → real product-analytics queries (PostHog
 etc.) comparing current traffic to baseline.
@@ -46,18 +49,21 @@ etc.) comparing current traffic to baseline.
 Black Friday?" verdict the agent uses to distinguish a legit surge from an attack.
 
 ## 4. Load-balancer context — Iva
+
 **File:** [src/context/providers/load-balancer/index.ts](../src/context/providers/load-balancer/index.ts)
 **Replace:** `createStubLoadBalancerSource()` → real ingress/LB log queries.
 **Done when:** returns real request rates, 4xx/5xx breakdown, latency, and the
 top offending route from in-cluster ingress logs.
 
 ## 5. Kubernetes context — core / Dimitar
+
 **File:** [src/context/providers/kubernetes/index.ts](../src/context/providers/kubernetes/index.ts)
 **Replace:** `createStubKubernetesSource()` → a read-only k8s client.
 **Done when:** returns real pod status, restart reasons, recent events, and the
 current rollout image/version.
 
 ## 6. Incident trigger — Strato (plot twist + entry point)
+
 **File:** [src/context/providers/trigger/index.ts](../src/context/providers/trigger/index.ts)
 **Replace:** `createStubTriggerSource()` → parse the real alert payload
 (Alertmanager webhook / k8s event) that fires `runOrchestrator`.
@@ -69,6 +75,7 @@ current rollout image/version.
 ## Escalation channels
 
 ### Slack — Iva
+
 **File:** [src/escalation/channels/slack/index.ts](../src/escalation/channels/slack/index.ts)
 **Replace:** `createStubSlackClient()` → Slack Web API (`chat.postMessage`).
 **Keep:** `renderSlackText(report)` (tune the formatting as you like).
@@ -76,12 +83,14 @@ current rollout image/version.
 summary/timeline/next-steps; `ref` is the real permalink.
 
 ### PagerDuty — Strato
+
 **File:** [src/escalation/channels/pagerduty/index.ts](../src/escalation/channels/pagerduty/index.ts)
 **Replace:** `createStubPagerDutyClient()` → PagerDuty Events API v2.
 **Done when:** one real alert is raised, routed to the owner from the report
 (`suggested_owner`), with the dynamic description; `ref` is the real incident URL.
 
 ### Suggested-fix PR — Bojo
+
 **Files:** subagent [src/subagents/suggest-fix-pr/](../src/subagents/suggest-fix-pr/)
 (`github-pr-client.ts`, `tools.ts`, `prompt.ts`, `index.ts`) + the thin adapter
 [src/escalation/channels/suggest-fix-pr/index.ts](../src/escalation/channels/suggest-fix-pr/index.ts).
@@ -102,6 +111,7 @@ dispatch: open as a draft and scope the GitHub token so it cannot merge.
 ## Investigative tools (optional, agent-pulled during Analyze)
 
 ### Web search — owner TBD
+
 **Files:** [src/subagents/web-search/](../src/subagents/web-search/)
 **Replace:** `createWebSearchClient()` stub → a real provider (Brave/Tavily/Bing).
 **Done when:** the Analyze agent can research a focused question (e.g. "known CVE
@@ -112,6 +122,7 @@ dropped in `src/subagents/` becomes a tool the analysis can pull on demand.
 ---
 
 ## The orchestration layer — Kaloyan (this branch, done)
+
 **Files:** [src/orchestrator/](../src/orchestrator/), [src/context/](../src/context/)
 (types + registry), [src/escalation/](../src/escalation/) (types + registry +
 dispatch), extended [src/tools/escalate.ts](../src/tools/escalate.ts),
