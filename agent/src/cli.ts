@@ -49,10 +49,13 @@ async function main(): Promise<void> {
     return;
   }
 
-  const { agent, describe } = buildAgent();
+  const { agent, describe, subagents } = await buildAgent();
   attachConsoleRenderer(agent);
 
   process.stdout.write(`Model: ${describe}\n`);
+  process.stdout.write(
+    `Subagents: ${subagents.length ? subagents.join(", ") : "(none)"}\n`,
+  );
   process.stdout.write(`Incident:\n${incident}\n\n--- working ---\n`);
 
   await agent.prompt(

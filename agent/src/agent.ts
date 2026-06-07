@@ -2,22 +2,30 @@ import { Agent } from "@earendil-works/pi-agent-core";
 import { getApiKey, loadConfig } from "./config.js";
 import { SYSTEM_PROMPT } from "./prompts.js";
 import { buildTools } from "./tools/index.js";
+import { buildSubagentTools } from "./subagents/index.js";
 
 export interface BuildAgentResult {
   agent: Agent;
   describe: string;
+  /** Names of the subagents discovered and wired as tools. */
+  subagents: string[];
 }
 
-/** Construct the L1 on-call agent wired with config, prompt, and tools. */
-export function buildAgent(): BuildAgentResult {
+/** Construct the L1 on-call agent wired with config, prompt, tools, subagents. */
+export async function buildAgent(): Promise<BuildAgentResult> {
   const { provider, model, thinkingLevel } = loadConfig();
+
+  // Subagents inherit the parent's provider/model config and are exposed as
+  // tools the parent can delegate to.
+  const subagentTools = await buildSubagentTools({ model, thinkingLevel, getApiKey });
+  const tools = [...buildTools(), ...subagentTools];
 
   const agent = new Agent({
     initialState: {
       systemPrompt: SYSTEM_PROMPT,
       model,
       thinkingLevel,
-      tools: buildTools(),
+      tools,
     },
     getApiKey,
     // Run remediation/diagnostic tools one at a time. During an incident,
@@ -25,7 +33,11 @@ export function buildAgent(): BuildAgentResult {
     toolExecution: "sequential",
   });
 
-  return { agent, describe: `${provider}/${model.id} (thinking: ${thinkingLevel})` };
+  return {
+    agent,
+    describe: `${provider}/${model.id} (thinking: ${thinkingLevel})`,
+    subagents: subagentTools.map((t) => t.name),
+  };
 }
 
 /**

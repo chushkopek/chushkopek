@@ -53,16 +53,32 @@ Escalation handoffs are written to `agent/escalations/` as markdown.
 ```
 src/
   cli.ts          Entry point: parse the incident, run the agent, stream output
-  agent.ts        buildAgent() factory + console renderer
+  agent.ts        buildAgent() factory (async) + console renderer
   config.ts       Provider/model/thinking resolution from env
   prompts.ts      L1 on-call system prompt (guardrails + operating loop)
   tools/
-    index.ts      Tool registry (where GitHub tools land next)
+    index.ts      Core tool registry
     escalate.ts   Terminal escalation handoff tool
+  subagents/      Subagent framework + one folder per subagent
+    types.ts      The Subagent contract
+    runtime.ts    runLlmSubagent() helper (child agent loop)
+    registry.ts   Auto-discovery + subagent->tool wrapper
+    github-issue/ Reference subagent: open a GitHub issue from incident context
+docs/
+  subagents.md          How to author a subagent (start here)
+  subagent-template.md  Copy-paste starter
 ```
+
+## Subagents
+
+The parent agent delegates focused work to **subagents**, each exposed as a tool.
+Subagents are auto-discovered from `src/subagents/<name>/` — add a folder, no
+shared files to edit, so teammates can build different subagents concurrently.
+
+See **[docs/subagents.md](docs/subagents.md)** to author one.
 
 ## Roadmap
 
-- **Next:** GitHub access tools — read repos/issues/PRs/Actions, correlate
-  recent changes to the incident, and open an escalation issue. These register
-  in `src/tools/index.ts`.
+- **Next:** GitHub access tools — a token-backed `GitHubClient` (read
+  repos/issues/PRs/Actions, open issues). The `github-issue` subagent already
+  consumes this behind an interface; today it uses a stub client.
