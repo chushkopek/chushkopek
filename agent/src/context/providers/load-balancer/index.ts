@@ -1,4 +1,5 @@
 import type { ContextProvider, ProviderSlice } from "../../types.js";
+import { stubsEnabled } from "../../../stubs.js";
 
 /**
  * Load-balancer provider — in-cluster ingress traffic logs: request rates,
@@ -45,9 +46,9 @@ export const provider: ContextProvider<LoadBalancerSlice> = {
   name: "load-balancer",
   label: "Load Balancer Traffic",
   order: 40,
-  // Stand down when the real context-fetcher is wired in: it supplies the same
-  // ingress/Envoy access-log signals from Loki (no contradictory simulated data).
-  enabled: () => !process.env.CONTEXT_FETCHER_URL?.trim(),
+  // Simulated stub. Runs only in demo mode (ENABLE_STUBS=1), and even then
+  // stands down when the real context-fetcher supplies live ingress/Loki signals.
+  enabled: () => stubsEnabled() && !process.env.CONTEXT_FETCHER_URL?.trim(),
   async gather(ctx): Promise<ProviderSlice<LoadBalancerSlice>> {
     try {
       const data = await source.inspect("storefront");

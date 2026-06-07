@@ -1,4 +1,5 @@
 import type { ContextProvider, ProviderSlice } from "../../types.js";
+import { stubsEnabled } from "../../../stubs.js";
 
 /**
  * Trigger provider — the k8s event / probe failure that paged us. This is the
@@ -48,6 +49,9 @@ export const provider: ContextProvider<TriggerSlice> = {
   name: "trigger",
   label: "Incident Trigger",
   order: 0,
+  // Simulated stub — only runs in demo mode (ENABLE_STUBS=1). The raw trigger
+  // text still flows to the analysis regardless; this just adds a fake slice.
+  enabled: () => stubsEnabled(),
   async gather(ctx): Promise<ProviderSlice<TriggerSlice>> {
     try {
       const data = await source.resolve(ctx.trigger);

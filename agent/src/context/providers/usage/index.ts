@@ -1,4 +1,5 @@
 import type { ContextProvider, ProviderSlice } from "../../types.js";
+import { stubsEnabled } from "../../../stubs.js";
 
 /**
  * Usage provider — answers "is this organic load (e.g. Black Friday) or
@@ -48,6 +49,8 @@ export const provider: ContextProvider<UsageSlice> = {
   name: "usage",
   label: "Application Usage",
   order: 30,
+  // Simulated stub (hardcoded traffic verdict) — only runs in demo mode.
+  enabled: () => stubsEnabled(),
   async gather(ctx): Promise<ProviderSlice<UsageSlice>> {
     try {
       const data = await source.classify("storefront");

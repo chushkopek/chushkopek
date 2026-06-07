@@ -1,5 +1,6 @@
 import type { EscalationReport } from "../../../tools/escalate.js";
 import type { Dispatcher, EscalationOutcome } from "../../types.js";
+import { stubsEnabled } from "../../../stubs.js";
 
 /**
  * PagerDuty dispatcher — raises one alert routed to the service owner with a
@@ -60,6 +61,8 @@ const pagerduty = createStubPagerDutyClient();
 export const dispatcher: Dispatcher = {
   name: "pagerduty",
   label: "PagerDuty Alert",
+  // Simulated stub (no real Events API alert) — only runs in demo mode.
+  enabled: () => stubsEnabled(),
   async dispatch(report): Promise<EscalationOutcome> {
     try {
       const incident = await pagerduty.trigger({
