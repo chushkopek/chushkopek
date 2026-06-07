@@ -137,6 +137,14 @@ node dist/cli.js "redis latency spiked, checkout timing out"
 
 Escalation handoffs are written to `agent/escalations/` as markdown.
 
+Or run it as an HTTP service so alert sources can trigger incidents:
+
+```bash
+npm run serve   # POST /incidents { service, alert, description } on :8000
+```
+
+See **[docs/http-api.md](docs/http-api.md)** for the endpoints, polling, and auth.
+
 ## Orchestration
 
 An incident runs through a deterministic **3-phase pipeline** wrapping an
@@ -194,9 +202,11 @@ src/
     web-search/   Investigative tool the Analyze phase can pull on demand
 docs/
   orchestration-spec.md  The pipeline flow (start here)
+  http-api.md            HTTP endpoints (POST /incidents, polling, auth)
   IMPLEMENTATION.md      Follow-up: who replaces which stub
   context-providers.md   How to author/replace a context source
   dispatchers.md         How to author/replace an escalation channel
+  escalation-handoff.md  How an escalation must be documented for L2
   subagents.md           How to author a subagent
   subagent-template.md   Copy-paste starter
 ```
