@@ -84,7 +84,10 @@ summary/timeline/next-steps; `ref` is the real permalink.
 **Files:** subagent [src/subagents/suggest-fix-pr/](../src/subagents/suggest-fix-pr/)
 (`github-pr-client.ts`, `tools.ts`, `prompt.ts`, `index.ts`) + the thin adapter
 [src/escalation/channels/suggest-fix-pr/index.ts](../src/escalation/channels/suggest-fix-pr/index.ts).
-**Replace:** `createGitHubPrClient()` stub → real branch + commit + PR creation.
+**Replace:** `createGitHubPrClient()` stub → real branch + commit + PR creation
+via [src/github/](../src/github/) + [src/sandbox/](../src/sandbox/) (sandboxed
+`gh` CLI with a repo-scoped installation token; scope permissions to
+`contents: write` + `pull_requests: write` only).
 **Tune:** `SUGGEST_FIX_PR_PROMPT` so the drafted fix matches your repos.
 **Done when:** a real suggested-fix PR is opened on the failing service's repo,
 drafted from the escalation context (root cause + suspected change). The adapter
