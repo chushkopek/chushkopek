@@ -43,7 +43,7 @@ evidence into a root-cause + severity + owner.
                               OrchestratorResult → CLI prints the outcomes
 ```
 
-\* The `suggest-fix-pr` dispatcher is the one exception: it is a thin adapter
+\* The `github` dispatcher is the one exception: it is a thin adapter
 that runs an LLM subagent. It still returns a normal `EscalationOutcome`, so the
 fan-out treats it like any other channel.
 

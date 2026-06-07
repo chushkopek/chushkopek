@@ -34,6 +34,12 @@ export interface CreateBashToolOptions {
   maxOutputChars?: number;
   /** Override the tool description shown to the model. */
   description?: string;
+  /**
+   * Working directory every command runs from inside the sandbox. Use this to
+   * pin the model to a checkout root — without it, `cd` does not carry over
+   * between calls (each command is an independent `sh -c`).
+   */
+  workdir?: string;
 }
 
 function truncate(text: string, max: number): { text: string; truncated: boolean } {
@@ -65,6 +71,7 @@ export function createBashTool(
     execute: async (_toolCallId, params, signal) => {
       const { stdout, stderr, exitCode } = await sandbox.exec(params.command, {
         signal,
+        workdir: options.workdir,
       });
 
       const combined = [

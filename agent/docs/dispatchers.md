@@ -62,14 +62,14 @@ function createStubSlackClient(): SlackClient { /* simulated */ }
 Swap the stub for the real Slack/PagerDuty client later; the `dispatcher` object
 is unchanged.
 
-### 2. LLM-backed (e.g. suggest-fix-pr)
+### 2. LLM-backed (e.g. github)
 
-When the channel needs reasoning (drafting a PR), the dispatcher is a **thin
-adapter** over a real subagent. See
-`src/escalation/channels/suggest-fix-pr/index.ts`: it maps the report into the
-`suggest_fix_pr` subagent's input, runs it via the subagent's `run()`, and maps
-the result to an `EscalationOutcome`. The actual LLM work lives in
-`src/subagents/suggest-fix-pr/` (authored per `docs/subagents.md`).
+When the channel needs reasoning (filing an issue / drafting a PR), the
+dispatcher is a **thin adapter** over a real subagent. See
+`src/escalation/channels/github/index.ts`: it maps the report into the
+`github_file_issue_and_pr` subagent's input, runs it via the subagent's `run()`,
+and maps the result to an `EscalationOutcome`. The actual LLM work lives in
+`src/subagents/github/` (authored per `docs/subagents.md`).
 
 Keep the heavy logic in the subagent; the dispatcher is just the bridge from the
 deterministic fan-out to the agentic worker.

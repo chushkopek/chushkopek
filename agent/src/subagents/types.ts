@@ -40,7 +40,7 @@ export interface SubagentResult<TDetails = unknown> {
 export interface Subagent<TInput extends TSchema = TSchema, TDetails = unknown> {
   /**
    * Tool name the parent uses to invoke this subagent. Must be unique,
-   * snake_case, and stable (e.g. "create_github_issue").
+   * snake_case, and stable (e.g. "github_file_issue_and_pr").
    */
   name: string;
   /** Human-readable label for UI/logs. */
@@ -52,6 +52,14 @@ export interface Subagent<TInput extends TSchema = TSchema, TDetails = unknown> 
   description: string;
   /** Typebox schema for the input the parent must provide. */
   inputSchema: TInput;
+  /**
+   * Whether to expose this subagent to the parent L1 agent as a callable tool.
+   * Defaults to true. Set false for subagents that are driven only by the
+   * deterministic dispatch phase (e.g. a write action that must not be invoked
+   * ad hoc during analysis) — they are still discovered and importable, just not
+   * handed to the parent.
+   */
+  exposeToParent?: boolean;
   /** Run the subagent to completion and return a structured result. */
   run(input: Static<TInput>, ctx: SubagentContext): Promise<SubagentResult<TDetails>>;
 }

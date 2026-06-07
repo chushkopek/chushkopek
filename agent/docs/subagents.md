@@ -25,16 +25,23 @@ imports each one's `index.js` (resolves to `index.ts` in dev). It expects a
 Subagent **names must be unique** (discovery throws on duplicates) and stable,
 since the name is the tool name the parent calls.
 
+A subagent may set `exposeToParent: false` to opt out of being handed to the
+parent L1 agent as a tool. It is still discovered (and importable directly, e.g.
+by a dispatcher), just not callable mid-analysis. Use this for subagents that
+should run only in the guaranteed Phase 3 dispatch — for example the `github`
+subagent, a write action that must not be invoked ad hoc.
+
 ## The contract
 
 Defined in `src/subagents/types.ts`:
 
 ```ts
 interface Subagent<TInput extends TSchema, TDetails> {
-  name: string;          // snake_case tool name, e.g. "create_github_issue"
+  name: string;          // snake_case tool name, e.g. "github_file_issue_and_pr"
   label: string;         // human-readable label
   description: string;   // tells the PARENT when to delegate here
   inputSchema: TInput;   // typebox schema = the tool's parameters
+  exposeToParent?: boolean; // default true; false = dispatch-only, not a parent tool
   run(input, ctx): Promise<SubagentResult<TDetails>>;
 }
 ```
@@ -103,20 +110,21 @@ block teammates.
 - **Throw on tool failure** (don't return errors as content) — the loop reports
   them to the LLM as tool errors.
 - **Degrade gracefully when external access isn't configured** — return a clear
-  `summary` saying so rather than fabricating a result (see how `github-issue`
+  `summary` saying so rather than fabricating a result (see how `github`
   reports "not configured" when no GitHub App is set up).
 - **Reuse shared infrastructure.** Cross-cutting capabilities live outside the
   subagent folders: `src/github/` (GitHub App auth) and `src/sandbox/` (podman
-  sandbox + a `bash` tool). The `github-issue` subagent composes both.
+  sandbox + a `bash` tool). The `github` subagent composes both.
 
 ## Testing your subagent
 
 Use the SDK's faux provider to drive your subagent with no network or API key.
 Register a faux provider, script the assistant responses (including tool calls),
-and assert on the captured result. See the `github-issue` subagent for the shape
+and assert on the captured result. See the `github` subagent for the shape
 to mirror.
 
 ## Reference implementation
 
-`src/subagents/github-issue/` — drafts and opens a GitHub issue from incident
-context. Read it end to end as the canonical example.
+`src/subagents/github/` — files a GitHub issue and, when a fix is clearly
+implied, opens a draft suggested-fix PR from a checkout of the repo. Read it end
+to end as the canonical example.
