@@ -82,6 +82,10 @@ function makeRenderer(): (event: AgentEvent) => void {
         );
         break;
       }
+      case "agent_end": {
+        endStream();
+        break;
+      }
       default:
         break;
     }
@@ -136,6 +140,9 @@ async function main(): Promise<void> {
   process.stdout.write(`${result.summary}\n`);
   if (result.details?.issueUrl) {
     process.stdout.write(`Issue URL: ${result.details.issueUrl}\n`);
+  }
+  if (result.details?.llmError) {
+    process.exitCode = 1;
   }
 }
 

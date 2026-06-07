@@ -47,12 +47,56 @@ async function checkModel(): Promise<void> {
     const { provider, model, thinkingLevel } = loadConfig();
     pass(`Resolved model: ${provider}/${model.id} (thinking: ${thinkingLevel})`);
     const key = getApiKey(provider);
-    if (key) pass(`API key present for "${provider}"`);
-    else
+    if (!key) {
       fail(
         `No API key resolved for provider "${provider}".`,
         "Set the matching key in .env (e.g. OPENROUTER_API_KEY).",
       );
+      return;
+    }
+
+    pass(`API key present for "${provider}"`);
+
+    if (provider === "openrouter") {
+      if (key.includes("/")) {
+        fail(
+          "OPENROUTER_API_KEY looks like a model slug, not an API key.",
+          'Set OPENROUTER_API_KEY to your key from https://openrouter.ai/keys ' +
+            '(starts with sk-or-). Put the model slug in MODEL_ID instead.',
+        );
+        return;
+      }
+      if (!key.startsWith("sk-or-")) {
+        fail(
+          'OPENROUTER_API_KEY has an unexpected format (expected sk-or-...).',
+          "Copy a fresh key from https://openrouter.ai/keys into agent/.env.",
+        );
+        return;
+      }
+
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: model.id,
+          messages: [{ role: "user", content: "ping" }],
+          max_tokens: 1,
+        }),
+      });
+      if (res.ok) {
+        pass("OpenRouter chat API accepts the key.");
+      } else {
+        const body = await res.text().catch(() => "");
+        fail(
+          `OpenRouter chat API rejected the key (HTTP ${res.status}).`,
+          body.slice(0, 200) ||
+            "Verify OPENROUTER_API_KEY in agent/.env and that the model is available to your account.",
+        );
+      }
+    }
   } catch (e) {
     fail(`Model config error: ${errMsg(e)}`, "See agent/.env.example.");
   }

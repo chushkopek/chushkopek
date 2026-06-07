@@ -23,6 +23,8 @@ export interface RunLlmSubagentResult<TCaptured = unknown> {
   finalText: string;
   /** Captured tool details, if `captureToolName` was provided and matched. */
   captured?: TCaptured;
+  /** Set when the model turn ended with stopReason "error". */
+  llmError?: string;
 }
 
 /** Extract concatenated text from the last assistant message in a transcript. */
@@ -44,6 +46,22 @@ function lastAssistantText(messages: AgentMessage[]): string {
     return "";
   }
   return "";
+}
+
+/** Return the error message from the last failed assistant turn, if any. */
+function lastAssistantError(messages: AgentMessage[]): string | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (!msg || msg.role !== "assistant") continue;
+    const assistant = msg as {
+      stopReason?: string;
+      errorMessage?: string;
+    };
+    if (assistant.stopReason === "error" && assistant.errorMessage) {
+      return assistant.errorMessage;
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -93,5 +111,10 @@ export async function runLlmSubagent<TCaptured = unknown>(
   await agent.prompt(task);
   await agent.waitForIdle();
 
-  return { finalText: lastAssistantText(agent.state.messages), captured };
+  const llmError = lastAssistantError(agent.state.messages);
+  return {
+    finalText: lastAssistantText(agent.state.messages),
+    captured,
+    llmError,
+  };
 }

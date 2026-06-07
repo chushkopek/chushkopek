@@ -31,6 +31,7 @@ interface Details {
   /** URL of the created issue, if one was detected in the gh output. */
   issueUrl?: string;
   finalText: string;
+  llmError?: string;
 }
 
 const DEFAULT_SANDBOX_IMAGE = "docker.io/maniator/gh:latest";
@@ -121,12 +122,20 @@ export const subagent: Subagent<typeof InputSchema, Details> = {
     };
 
     try {
-      const { finalText } = await runLlmSubagent({
+      const { finalText, llmError } = await runLlmSubagent({
         ctx: wrappedCtx,
         systemPrompt: GITHUB_ISSUE_PROMPT,
         tools: [createBashTool(sandbox)],
         task: renderTask(input),
       });
+
+      if (llmError) {
+        return {
+          summary:
+            `Model call failed before an issue could be created: ${llmError}`,
+          details: { finalText, llmError },
+        };
+      }
 
       const issueUrl =
         issueUrls[issueUrls.length - 1] ?? finalText.match(ISSUE_URL_RE)?.[0];
