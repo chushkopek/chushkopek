@@ -59,6 +59,24 @@ Also under "world context" (next-iteration, already scaffolded):
 **Done when:** returns real request rates, 4xx/5xx breakdown, latency, and the
 top offending route from in-cluster ingress logs.
 
+### Real cluster context (context-fetcher) — supersedes #1, #4, #5
+
+The [`context-fetcher`](../../context-fetcher) submodule is a small in-cluster
+HTTP service that returns ONE structured brief per service — live
+Deployment/Service/HTTPRoute manifest, pod/workload state + k8s events, curated
+Prometheus metrics, Loki access logs, and pod logs. The provider at
+[src/context/providers/context-fetcher/index.ts](../src/context/providers/context-fetcher/index.ts)
+wraps it as a Gather slice.
+
+It is **opt-in**: set `CONTEXT_FETCHER_URL` (see [.env.example](../.env.example))
+to enable it. When on, it supplies the real-cluster equivalent of the Grafana
+(#1), load-balancer (#4), and Kubernetes (#5) signals, so those three stubs
+**stand down automatically** (their `enabled` flags go false) — no contradictory
+simulated data. The service to fetch is taken from `CONTEXT_FETCHER_SERVICE`, or
+a `<ns/name>` id parsed from the trigger (e.g. `demo/whoami`), or a known catalog
+name. Leave `CONTEXT_FETCHER_URL` unset and the demo runs on stubs exactly as
+before.
+
 ## 5. Kubernetes context — core / Dimitar
 
 **File:** [src/context/providers/kubernetes/index.ts](../src/context/providers/kubernetes/index.ts)
