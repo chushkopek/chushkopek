@@ -51,15 +51,23 @@ ${sections || "_(no context sources were available)_"}
 ## Your task
 Follow the L1 process over the evidence above:
 1. Triage — restate the incident, affected service, blast radius, severity.
-2. Correlate the slices into a single root-cause hypothesis with a confidence level.
-3. Classify the traffic from the usage/load-balancer evidence: organic surge
-   (e.g. Black Friday) vs likely attack vs inconclusive.
-4. Identify the suspected change (deploy/commit/PR) from the GitHub evidence.
-5. Derive the owning team from CODEOWNERS where available.
-6. If a gap blocks your analysis and an investigative tool (e.g. web_search) is
-   available, use it before concluding.
+2. Identify the affected component — correlate the service-context components with
+   the load-balancer route and k8s evidence to name WHICH part of the service is hit.
+3. Form a single root-cause hypothesis with a confidence level, and classify it
+   into ONE of three classes:
+   - attack — a malicious exploit/abuse;
+   - bug_or_regression — a single bad change/deploy;
+   - external_or_organic — a real-world event or trend (organic surge, launch,
+     upstream/partner outage, advisory) rather than an attack or a code bug.
+4. Rule the external/organic class in or out: when traffic looks organic or
+   inconclusive, the symptom is load-shaped, or there is no clear internal change,
+   call the external_events investigator BEFORE concluding. Use web_search for
+   technical reference gaps (CVEs, error signatures).
+5. Identify the suspected change (deploy/commit/PR) from the GitHub evidence.
+6. Derive the owning team from CODEOWNERS where available.
 
-Finish by calling the escalate tool exactly once, populating root_cause_hypothesis,
-confidence, traffic_assessment, suspected_change, evidence_links, suggested_owner,
-and owner_source whenever the evidence supports them.`;
+Finish by calling the escalate tool exactly once, populating incident_class,
+root_cause_hypothesis, confidence, traffic_assessment, external_factors,
+suspected_change, evidence_links, suggested_owner, and owner_source whenever the
+evidence supports them.`;
 }

@@ -93,6 +93,29 @@ const EscalationParams = Type.Object({
         "How the suggested owner was derived (e.g. 'CODEOWNERS:/frontend/').",
     }),
   ),
+  incident_class: Type.Optional(
+    Type.Union(
+      [
+        Type.Literal("attack"),
+        Type.Literal("bug_or_regression"),
+        Type.Literal("external_or_organic"),
+        Type.Literal("inconclusive"),
+      ],
+      {
+        description:
+          "Which hypothesis class best explains the incident: a malicious " +
+          "attack/exploit, a single bug/regression, an external/organic event or " +
+          "trend, or inconclusive.",
+      },
+    ),
+  ),
+  external_factors: Type.Optional(
+    Type.String({
+      description:
+        "Any real-world event/trend that helps explain the incident (with " +
+        "citations), or 'none found'. Populate from the external_events investigation.",
+    }),
+  ),
 });
 
 export type EscalationReport = Static<typeof EscalationParams>;
@@ -107,12 +130,18 @@ function renderReport(report: EscalationReport): string {
     const src = report.owner_source ? ` (${report.owner_source})` : "";
     lines.push(`Suggested owner: ${report.suggested_owner}${src}`);
   }
+  if (report.incident_class) {
+    lines.push(`Incident class: ${report.incident_class}`);
+  }
   if (report.root_cause_hypothesis) {
     const conf = report.confidence ? ` [confidence: ${report.confidence}]` : "";
     lines.push(`Root-cause hypothesis: ${report.root_cause_hypothesis}${conf}`);
   }
   if (report.traffic_assessment) {
     lines.push(`Traffic assessment: ${report.traffic_assessment}`);
+  }
+  if (report.external_factors) {
+    lines.push(`External factors: ${report.external_factors}`);
   }
   if (report.suspected_change) {
     lines.push(`Suspected change: ${report.suspected_change}`);

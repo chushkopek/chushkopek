@@ -48,6 +48,10 @@ etc.) comparing current traffic to baseline.
 `likely_attack` vs `inconclusive`) with a rationale — this is the "is it really
 Black Friday?" verdict the agent uses to distinguish a legit surge from an attack.
 
+Also under "world context" (next-iteration, already scaffolded):
+- **Service context** — [src/context/providers/service-context/index.ts](../src/context/providers/service-context/index.ts): replace the in-code `CATALOG` stub with a real service catalog (Backstage / `service.yaml` / config map) so "what the service is + its components" is real.
+- **External events (Exa)** — the `external_events` investigator finds real-world events/trends (the third hypothesis class beyond attack/bug). Set `EXA_API_KEY` to switch [search-client.ts](../src/subagents/web-search/search-client.ts) from stub to live Exa. The core is in [src/external-events/](../src/external-events/), exposed as a subagent (default) and an opt-in provider (`EXTERNAL_EVENTS_PROVIDER=1`).
+
 ## 4. Load-balancer context — Iva
 
 **File:** [src/context/providers/load-balancer/index.ts](../src/context/providers/load-balancer/index.ts)
@@ -110,14 +114,20 @@ dispatch: open as a draft and scope the GitHub token so it cannot merge.
 
 ## Investigative tools (optional, agent-pulled during Analyze)
 
-### Web search — owner TBD
+### Web search + external events — Kalata
 
-**Files:** [src/subagents/web-search/](../src/subagents/web-search/)
-**Replace:** `createWebSearchClient()` stub → a real provider (Brave/Tavily/Bing).
-**Done when:** the Analyze agent can research a focused question (e.g. "known CVE
-for this signature") and get live, cited results. This is the example of the
-"deterministic pipeline with options exposed to the agent" model — any subagent
-dropped in `src/subagents/` becomes a tool the analysis can pull on demand.
+**Files:** [src/subagents/web-search/](../src/subagents/web-search/) (generic
+technical lookups), [src/subagents/external-events/](../src/subagents/external-events/)
++ [src/external-events/](../src/external-events/) (the events/trends investigator),
+shared [search-client.ts](../src/subagents/web-search/search-client.ts).
+**Enable real search:** set `EXA_API_KEY` — both investigators switch from the
+stub to live [Exa](https://exa.ai) (the `external_events` core uses recency via
+`published_after`). No code change needed.
+**Done when:** `web_search` returns live cited results for technical questions,
+and `external_events` returns a real `found | none | inconclusive` verdict that
+the agent folds into `incident_class` / `external_factors`. Both are
+auto-discovered tools the analysis pulls on demand; `external-events` can also
+run as an opt-in provider (`EXTERNAL_EVENTS_PROVIDER=1`).
 
 ---
 

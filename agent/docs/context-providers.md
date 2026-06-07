@@ -81,10 +81,42 @@ All six demo providers live in `src/context/providers/`. Read
 `grafana/index.ts` as the canonical example — it shows the payload type, the
 client seam, the stub, and the three status returns.
 
+## Conditionally enabling a source (`enabled?`)
+
+A provider may set an optional `enabled?: boolean | (() => boolean)` (default:
+enabled). The registry skips it when this resolves false — a function is
+evaluated at gather time, so it can read env. Use it to feature-flag a source —
+e.g. one that is also an agent-pulled subagent and should be opt-in as a
+provider:
+
+```ts
+export const provider: ContextProvider<MySlice> = {
+  name: "external-events",
+  enabled: () => Boolean(process.env.EXTERNAL_EVENTS_PROVIDER?.trim()),
+  // …
+};
+```
+
+See `src/context/providers/external-events/index.ts` — the same external-events
+core is exposed both as the `external_events` subagent (default) and as this
+opt-in provider, with zero logic duplicated.
+
+## Extensibility invariants (keep new sources non-breaking)
+
+Adding a source is "drop a folder, zero shared-file edits." Keep it that way:
+
+1. **Slice payload `T` lives in your folder** — never a central union/type.
+2. **Only ever *add optional* fields** to `ProviderSlice` / `ProviderContext` /
+   `ContextProvider`. Never make an existing field required or rename one.
+3. **`render` stays structural** over `slices` — no per-source `switch`.
+4. **LLM-backed/investigative providers are first-class** — `ProviderContext`
+   already carries `model` / `thinkingLevel` / `getApiKey`, so a source can run
+   its own reasoning (see the external-events provider) with no new machinery.
+
 ## Conventions
 
 - **One source per provider.** If it grows two, split it.
 - **Never fabricate.** Stubs return clearly-labelled `simulated: true` demo data;
   real providers return only what the source actually says.
 - **Pick a sensible `order`** so your slice renders near related evidence
-  (trigger 0, metrics 10–20, traffic 40, infra 50).
+  (trigger 0, service-context 5, metrics 10–20, traffic 30–40, infra 50).

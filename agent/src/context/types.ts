@@ -66,6 +66,13 @@ export interface ContextProvider<T = unknown> {
   label: string;
   /** Render order in the analysis prompt (lower first; trigger ~0). */
   order?: number;
+  /**
+   * Whether this source participates in Gather. Defaults to enabled. Use it to
+   * feature-flag a source (e.g. one that is also exposed as an agent-pulled
+   * subagent and should be opt-in as a provider). A function is resolved at
+   * gather time, so it can read env. Optional → existing providers are unchanged.
+   */
+  enabled?: boolean | (() => boolean);
   /** Fetch the slice. Always resolves; never rejects. */
   gather(ctx: ProviderContext): Promise<ProviderSlice<T>>;
 }

@@ -8,6 +8,12 @@ import type {
   ProviderSlice,
 } from "./types.js";
 
+/** Resolve a provider's optional `enabled` flag (default: enabled). */
+function isEnabled(enabled: ContextProvider["enabled"]): boolean {
+  if (enabled === undefined) return true;
+  return typeof enabled === "function" ? enabled() : enabled;
+}
+
 function isProvider(value: unknown): value is ContextProvider {
   if (!value || typeof value !== "object") return false;
   const p = value as Partial<ContextProvider>;
@@ -68,11 +74,14 @@ export async function loadProviders(): Promise<ContextProvider[]> {
     seen.add(p.name);
   }
 
+  // Honor the optional `enabled` flag so a source can be feature-flagged off.
+  const active = providers.filter((p) => isEnabled(p.enabled));
+
   // Sort by render order (lower first), then name for stability.
-  providers.sort(
+  active.sort(
     (a, b) => (a.order ?? 100) - (b.order ?? 100) || a.name.localeCompare(b.name),
   );
-  return providers;
+  return active;
 }
 
 /**

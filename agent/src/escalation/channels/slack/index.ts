@@ -52,15 +52,19 @@ const slack = createStubSlackClient();
 
 function renderSlackText(report: EscalationReport): string {
   const owner = report.suggested_owner ? ` · owner ${report.suggested_owner}` : "";
+  const klass = report.incident_class ? `\n*Class:* ${report.incident_class}` : "";
   const cause = report.root_cause_hypothesis
     ? `\n*Suspected cause:* ${report.root_cause_hypothesis}` +
       (report.confidence ? ` (confidence: ${report.confidence})` : "")
+    : "";
+  const external = report.external_factors
+    ? `\n*External factors:* ${report.external_factors}`
     : "";
   const next = report.recommended_next_steps.map((s) => `• ${s}`).join("\n");
   return (
     `:rotating_light: *[${report.severity.toUpperCase()}] ${report.summary}*${owner}\n` +
     `*Affected:* ${report.affected_systems.join(", ")}\n` +
-    `*State:* ${report.current_state}${cause}\n` +
+    `*State:* ${report.current_state}${klass}${cause}${external}\n` +
     `*Next steps:*\n${next}`
   );
 }
