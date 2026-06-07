@@ -69,7 +69,9 @@ export const dispatcher: Dispatcher = {
         details: {
           affected_systems: report.affected_systems,
           current_state: report.current_state,
+          incident_class: report.incident_class,
           root_cause_hypothesis: report.root_cause_hypothesis,
+          external_factors: report.external_factors,
           suggested_owner: report.suggested_owner,
           recommended_next_steps: report.recommended_next_steps,
         },
