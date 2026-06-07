@@ -43,9 +43,10 @@ npm run dev:sonnet  # anthropic/claude-sonnet-4.6 via OpenRouter
 
 ## Actually running the GitHub integration end to end
 
-The `github-issue` subagent files real issues by giving the model a `bash` tool
-in a hardened **podman sandbox** where `gh` is pre-authenticated. Follow these
-steps once and you can file issues for real.
+The `github` subagent files real issues — and, when a fix is clearly implied,
+opens a draft suggested-fix PR — by cloning the repo into a hardened **podman
+sandbox** where `gh`/`git` are pre-authenticated and giving the model a `bash`
+tool pinned to the checkout. Follow these steps once and you can file for real.
 
 ### 1. Prerequisites
 
@@ -55,16 +56,33 @@ first use — no image to build.
 
 ### 2. Create a GitHub App (one time)
 
+All GitHub access happens through this App's **private key** — the agent signs a
+short-lived JWT with it, mints a repo-scoped installation token, and uses only
+that token inside the sandbox. There is no personal access token and no
+`gh auth login`; the App is the single source of authority.
+
 1. Go to **Settings → Developer settings → GitHub Apps → New GitHub App**
   (for an org: `https://github.com/organizations/<ORG>/settings/apps/new`).
 2. Set any name and homepage URL. Uncheck **Webhook → Active**.
-3. Under **Repository permissions**, set **Issues: Read and write**. (That's all
-  this subagent needs.) Leave everything else default.
+3. Under **Repository permissions**, set exactly these three (everything else
+  stays **No access**):
+
+   | Permission       | Access         | Why                                          |
+   | ---------------- | -------------- | -------------------------------------------- |
+   | **Issues**       | Read and write | File the incident issue.                     |
+   | **Contents**     | Read and write | Clone the repo and push a suggested-fix branch. |
+   | **Pull requests**| Read and write | Open the draft suggested-fix PR.             |
+
+   The agent mints tokens scoped to only these permissions (least privilege).
+   It opens PRs as **drafts and never merges them**, but note that Contents +
+   Pull requests write are inherently merge-capable, so the open-only guarantee
+   rests on the agent's prompt, not the permission set.
 4. Create the App, then on its page click **Generate a private key** — this
   downloads a `.pem` file.
 5. Note the **App ID** (shown at the top of the App's General page).
 6. Click **Install App** in the sidebar and install it on the repo(s) you want
-  to file issues into (choose "Only select repositories").
+  the agent to act on (choose "Only select repositories"). The installation must
+  grant the three permissions above on each target repo.
 
 ### 3. Configure `.env`
 
@@ -84,16 +102,18 @@ npm run doctor -- --owner <owner> --repo <repo>  # also mints a token & hits the
 
 Every line should read `PASS` (or an intentional `SKIP`).
 
-### 5. File a real issue with a real model
+### 5. File a real issue (and maybe a fix PR) with a real model
 
 ```bash
 npm run file-issue -- --owner <owner> --repo <repo> \
   --context "api-gateway 5xx spike after deploy abc123; pods crashlooping"
 ```
 
-Other flags: `--context-file <path>`, `--severity sev2`, `--labels incident,bug`.
-With no `--context`, a clearly-marked sample incident is used. The created issue
-URL is printed at the end.
+Other flags: `--context-file <path>`, `--severity sev2`, `--labels incident,bug`,
+`--base <branch>`, `--suspected-change <ref>`. With no `--context`, a
+clearly-marked sample incident is used. It always files an issue and, when the
+context clearly implies a concrete low-risk fix, opens a draft suggested-fix PR;
+the created issue and PR URLs are printed at the end.
 
 ## Run
 
@@ -127,7 +147,7 @@ agentic core (`src/orchestrator/`):
 2. **Analyze** — the L1 agent reasons over the bundle and emits a structured
    `EscalationReport` (it may pull investigative subagents like `web_search`).
 3. **Dispatch** — every channel (`src/escalation/channels/<name>/`) fans the
-   report out in parallel → Slack, PagerDuty, suggested-fix PR.
+   report out in parallel → Slack, PagerDuty, GitHub (issue + draft fix PR).
 
 Phases 1 and 3 are deterministic (no LLM), so every source is gathered and every
 channel is notified — guarantees, not model decisions. See
@@ -156,7 +176,7 @@ src/
     types.ts      Dispatcher + EscalationOutcome contracts
     registry.ts   Auto-discovery
     dispatch.ts   Parallel runDispatch()
-    channels/     One folder per channel (slack, pagerduty, suggest-fix-pr)
+    channels/     One folder per channel (slack, pagerduty, github)
   agent.ts        buildAgent() factory (async) + console renderer
   config.ts       Provider/model/thinking resolution from env
   prompts.ts      L1 on-call system prompt (guardrails + operating loop)
@@ -170,8 +190,7 @@ src/
     types.ts      The Subagent contract
     runtime.ts    runLlmSubagent() helper (child agent loop)
     registry.ts   Auto-discovery + subagent->tool wrapper
-    github-issue/ Reference subagent: open a GitHub issue
-    suggest-fix-pr/ Drafts a fix PR from the escalation context
+    github/       Reference subagent: file an issue + optional draft fix PR
     web-search/   Investigative tool the Analyze phase can pull on demand
 docs/
   orchestration-spec.md  The pipeline flow (start here)

@@ -27,6 +27,11 @@ export interface SandboxOptions {
   /** Process cap, passed to `--pids-limit`. Defaults to 100. */
   pidsLimit?: number;
   /**
+   * Size of the writable `/tmp` tmpfs scratch. Defaults to "64m". Bump it when
+   * the workload needs disk (e.g. cloning a repo into the sandbox).
+   */
+  tmpfsSize?: string;
+  /**
    * Entrypoint used to keep the container alive. Some images (e.g. maniator/gh)
    * set an entrypoint that exits immediately, so we override it. Defaults to
    * `sleep` with arg `infinity`.
@@ -46,6 +51,12 @@ export interface ExecOptions {
   signal?: AbortSignal;
   /** Cap on combined stdout+stderr captured per command (bytes). */
   maxBuffer?: number;
+  /**
+   * Working directory inside the container (`podman exec -w`). Each `exec` is an
+   * independent `sh -c`, so `cd` does not persist between calls — set this to
+   * run from a fixed directory (e.g. a cloned repo root).
+   */
+  workdir?: string;
 }
 
 interface RawRun {
@@ -111,7 +122,7 @@ export class PodmanSandbox {
       String(options.pidsLimit ?? 100),
       "--read-only",
       "--tmpfs",
-      "/tmp:rw,exec,size=64m",
+      `/tmp:rw,exec,size=${options.tmpfsSize ?? "64m"}`,
       // The keep-alive process (busybox `sleep`) ignores SIGTERM, so make
       // removal kill it immediately instead of waiting out the stop timeout.
       "--stop-signal",
@@ -150,10 +161,13 @@ export class PodmanSandbox {
     if (!this.containerId) {
       throw new Error("Sandbox is closed.");
     }
-    const result = await runPodman(
-      ["exec", this.containerId, "sh", "-c", command],
-      { signal: options.signal, maxBuffer: options.maxBuffer },
-    );
+    const execArgs = ["exec"];
+    if (options.workdir) execArgs.push("-w", options.workdir);
+    execArgs.push(this.containerId, "sh", "-c", command);
+    const result = await runPodman(execArgs, {
+      signal: options.signal,
+      maxBuffer: options.maxBuffer,
+    });
     return {
       stdout: result.stdout,
       stderr: result.stderr,

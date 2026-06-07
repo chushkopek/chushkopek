@@ -162,7 +162,7 @@ async function checkGitHubApp(
   }
   if (!config) {
     skip(
-      "GitHub App not configured (GITHUB_APP_ID unset). Issue filing will be " +
+      "GitHub App not configured (GITHUB_APP_ID unset). Issue/PR filing will be " +
         "disabled. Set it in .env to enable.",
     );
     return;
@@ -186,7 +186,11 @@ async function checkGitHubApp(
     const token = await mintInstallationToken(config, {
       owner,
       repo,
-      permissions: { issues: "write" },
+      permissions: {
+        issues: "write",
+        contents: "write",
+        pull_requests: "write",
+      },
     });
     pass(
       `Minted repo-scoped token for ${owner}/${repo}` +
@@ -218,7 +222,23 @@ async function checkGitHubApp(
       fail(
         `gh could not access ${owner}/${repo} (exit ${r.exitCode}).`,
         (r.stderr || r.stdout).trim() ||
-          "Confirm the App is installed on that repo with Issues: write.",
+          "Confirm the App is installed on that repo with Issues, Contents, and Pull requests: write.",
+      );
+      return;
+    }
+
+    // The github subagent operates from a checkout, so verify a clone works
+    // with the minted token (contents: read/write).
+    const clone = await sandbox.exec(
+      `gh auth setup-git && gh repo clone ${owner}/${repo} /tmp/repo -- --depth 1 && git -C /tmp/repo rev-parse --short HEAD`,
+    );
+    if (clone.exitCode === 0) {
+      pass(`Cloned ${owner}/${repo} into the sandbox (HEAD ${clone.stdout.trim().split("\n").pop()}).`);
+    } else {
+      fail(
+        `Could not clone ${owner}/${repo} into the sandbox (exit ${clone.exitCode}).`,
+        (clone.stderr || clone.stdout).trim() ||
+          "Confirm the App grants Contents: write so the subagent can check out and push a fix branch.",
       );
     }
   } catch (e) {
