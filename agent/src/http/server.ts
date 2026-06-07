@@ -5,6 +5,10 @@ import type { OrchestratorResult } from "../orchestrator/types.js";
 
 loadEnv({ quiet: true });
 
+/** Shared secret. When set, POST requests must send it as `X-API-Key`. */
+const API_KEY = process.env.AGENT_API_KEY?.trim() || undefined;
+const VERSION = process.env.npm_package_version ?? "0.1.0";
+
 /**
  * HTTP entry point for the L1 agent.
  *
@@ -115,7 +119,17 @@ async function readBody(req: IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).toString("utf-8");
 }
 
+/** Shared-secret check (mirrors the slack-alerting X-API-Key convention). */
+function authorized(req: IncomingMessage, res: ServerResponse): boolean {
+  if (!API_KEY) return true; // auth disabled when no key configured
+  const provided = req.headers["x-api-key"];
+  if (provided === API_KEY) return true;
+  sendJson(res, 401, { error: "Invalid or missing X-API-Key." });
+  return false;
+}
+
 async function handlePostIncident(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (!authorized(req, res)) return;
   let parsed: unknown;
   try {
     const raw = await readBody(req);
@@ -152,7 +166,11 @@ const server = createServer((req, res) => {
   const path = url.pathname;
 
   if (method === "GET" && path === "/healthz") {
-    return sendJson(res, 200, { status: "ok" });
+    return sendJson(res, 200, {
+      status: "ok",
+      version: VERSION,
+      auth_required: API_KEY !== undefined,
+    });
   }
   if (method === "POST" && path === "/incidents") {
     void handlePostIncident(req, res);
@@ -166,7 +184,7 @@ const server = createServer((req, res) => {
   sendJson(res, 404, { error: `No route for ${method} ${path}.` });
 });
 
-const port = Number(process.env.PORT ?? 3000);
+const port = Number(process.env.PORT ?? 8000);
 server.listen(port, () => {
   process.stdout.write(
     `L1 agent HTTP server listening on :${port}\n` +
