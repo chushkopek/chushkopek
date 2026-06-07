@@ -89,22 +89,25 @@ summary/timeline/next-steps; `ref` is the real permalink.
 **Done when:** one real alert is raised, routed to the owner from the report
 (`suggested_owner`), with the dynamic description; `ref` is the real incident URL.
 
-### Suggested-fix PR — Bojo
+### GitHub issue + suggested-fix PR — Bojo (DONE)
 
-**Files:** subagent [src/subagents/suggest-fix-pr/](../src/subagents/suggest-fix-pr/)
-(`github-pr-client.ts`, `tools.ts`, `prompt.ts`, `index.ts`) + the thin adapter
-[src/escalation/channels/suggest-fix-pr/index.ts](../src/escalation/channels/suggest-fix-pr/index.ts).
-**Replace:** `createGitHubPrClient()` stub → real branch + commit + PR creation
-via [src/github/](../src/github/) + [src/sandbox/](../src/sandbox/) (sandboxed
-`gh` CLI with a repo-scoped installation token; scope permissions to
-`contents: write` + `pull_requests: write` only).
-**Tune:** `SUGGEST_FIX_PR_PROMPT` so the drafted fix matches your repos.
-**Done when:** a real suggested-fix PR is opened on the failing service's repo,
-drafted from the escalation context (root cause + suspected change). The adapter
-already maps the report → subagent input → outcome; you mostly touch the subagent.
-**Constraint — open-only:** the agent opens the PR for a human to review and
-**MUST NOT merge it** (no merge, auto-merge, or approve). Enforce it in your
-dispatch: open as a draft and scope the GitHub token so it cannot merge.
+**Files:** subagent [src/subagents/github/](../src/subagents/github/)
+(`index.ts`, `prompt.ts`) + the thin adapter
+[src/escalation/channels/github/index.ts](../src/escalation/channels/github/index.ts).
+**Status:** real, not stubbed. The `github` dispatcher maps the report → subagent
+input → outcome; the subagent mints a repo-scoped installation token
+(`issues` + `contents` + `pull_requests` write) via [src/github/](../src/github/),
+clones the repo into a [src/sandbox/](../src/sandbox/) podman sandbox so it
+operates from the **root of a checkout**, then files one issue and — when the
+context clearly implies a concrete low-risk fix — creates a branch, commits, and
+opens a draft suggested-fix PR linking the issue.
+**Constraint — open-only:** the PR is opened for a human to review and is **never
+merged** (no merge, auto-merge, or approve). Enforced by the prompt + `--draft`.
+Note: an installation token with `contents`/`pull_requests` write is inherently
+merge-capable, so open-only rests on the prompt + draft, not the token scope.
+**Note:** this subagent sets `exposeToParent: false`, so it runs only in the
+guaranteed Phase 3 dispatch, never as an ad-hoc Phase 2 tool — no duplicate
+filings.
 
 ---
 
@@ -146,4 +149,4 @@ echo "storefront readiness probe failing, CrashLoopBackOff in production" | npm 
 Expect: 6 Gather lines → the Analyze agent streaming + an `escalate` call → 3
 Dispatch outcome lines. The markdown handoff lands in `agent/escalations/`.
 Without an API key, the deterministic Gather + Dispatch phases still run; only
-the Analyze step and the suggest-fix-pr subagent need the model.
+the Analyze step and the github subagent (issue + fix PR) need the model.

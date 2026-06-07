@@ -33,7 +33,7 @@ export interface EscalationOutcome {
 
 /**
  * Runtime handed to a dispatcher. Deterministic channels use only `signal`;
- * LLM-backed dispatchers (e.g. suggest-fix-pr) use the model config to run a
+ * LLM-backed dispatchers (e.g. github) use the model config to run a
  * child agent.
  */
 export interface DispatcherContext {

@@ -1,13 +1,15 @@
 /**
- * Run the `create_github_issue` subagent directly against a real repo with a
- * real model — without going through a full incident/escalation. This is the
- * fastest way to end-to-end test the GitHub integration.
+ * Run the `github_file_issue_and_pr` subagent directly against a real repo with
+ * a real model — without going through a full incident/escalation. This is the
+ * fastest way to end-to-end test the GitHub integration. It always files an
+ * issue and, if the context clearly implies a concrete fix, opens a draft PR.
  *
  *   npm run file-issue -- --owner my-org --repo my-repo \
  *     --context "api-gateway 5xx spike after deploy abc123; pods crashlooping"
  *
  *   npm run file-issue -- --owner my-org --repo my-repo \
- *     --context-file ./incident.txt --severity sev2 --labels incident,bug
+ *     --context-file ./incident.txt --severity sev2 --labels incident,bug \
+ *     --base main --suspected-change abc123
  *
  * With no --context/--context-file, a clearly-marked sample incident is used.
  */
@@ -15,7 +17,7 @@ import { readFile } from "node:fs/promises";
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
 import { loadConfig, getApiKey } from "../config.js";
 import type { SubagentContext } from "../subagents/index.js";
-import { subagent } from "../subagents/github-issue/index.js";
+import { subagent } from "../subagents/github/index.js";
 
 interface Args {
   owner?: string;
@@ -24,6 +26,8 @@ interface Args {
   contextFile?: string;
   severity?: string;
   labels?: string[];
+  base?: string;
+  suspectedChange?: string;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -36,6 +40,8 @@ function parseArgs(argv: string[]): Args {
     else if (a === "--context") args.context = next();
     else if (a === "--context-file") args.contextFile = next();
     else if (a === "--severity") args.severity = next();
+    else if (a === "--base") args.base = next();
+    else if (a === "--suspected-change") args.suspectedChange = next();
     else if (a === "--labels")
       args.labels = (next() ?? "")
         .split(",")
@@ -98,7 +104,7 @@ async function main(): Promise<void> {
     process.stderr.write(
       "Usage: npm run file-issue -- --owner <o> --repo <r> " +
         '[--context "..."] [--context-file <path>] [--severity sevN] ' +
-        "[--labels a,b]\n",
+        "[--labels a,b] [--base <branch>] [--suspected-change <ref>]\n",
     );
     process.exitCode = 1;
     return;
@@ -132,6 +138,8 @@ async function main(): Promise<void> {
       incident_context: incidentContext,
       severity: args.severity,
       labels: args.labels,
+      base: args.base,
+      suspected_change: args.suspectedChange,
     },
     ctx,
   );
@@ -140,6 +148,9 @@ async function main(): Promise<void> {
   process.stdout.write(`${result.summary}\n`);
   if (result.details?.issueUrl) {
     process.stdout.write(`Issue URL: ${result.details.issueUrl}\n`);
+  }
+  if (result.details?.prUrl) {
+    process.stdout.write(`PR URL: ${result.details.prUrl}\n`);
   }
   if (result.details?.llmError) {
     process.exitCode = 1;

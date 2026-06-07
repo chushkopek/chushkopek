@@ -1,22 +1,39 @@
 import type { EscalationReport } from "../../../tools/escalate.js";
-import { subagent as suggestFixPrSubagent } from "../../../subagents/suggest-fix-pr/index.js";
-import type { CreatedPr } from "../../../subagents/suggest-fix-pr/github-pr-client.js";
+import { subagent as githubSubagent } from "../../../subagents/github/index.js";
 import type { Dispatcher, DispatcherContext, EscalationOutcome } from "../../types.js";
 
 /**
- * Suggest-fix-PR dispatcher — the one LLM-backed channel. It is a THIN adapter:
- * it maps the EscalationReport into the suggest_fix_pr subagent's input, runs
- * the subagent (which spins its own agent loop and opens a PR via a stub
- * client), and maps the result back to an EscalationOutcome. Owner: Bojo.
+ * GitHub dispatcher — the one LLM-backed channel. It is a THIN adapter: it maps
+ * the EscalationReport into the github subagent's input, runs the subagent
+ * (which clones the repo into a sandbox, files an issue, and — if a fix is
+ * clearly implied — opens a draft suggested-fix PR), and maps the result back
+ * to an EscalationOutcome.
  *
- * All the real work lives in src/subagents/suggest-fix-pr/. This adapter only
- * exists so the deterministic fan-out can reach the agentic PR drafter.
+ * All the real work lives in src/subagents/github/. This adapter only exists so
+ * the deterministic fan-out can reach the agentic GitHub worker.
  */
 
-const DEFAULT_REPO = process.env.FIX_PR_REPO ?? "acme/storefront";
+const FALLBACK_REPO = "acme/storefront";
 
-/** Pull an owner/repo out of the report's free text, else fall back to default. */
+function splitSlug(slug: string): { owner: string; repo: string } | undefined {
+  const [owner, repo] = slug.split("/");
+  if (owner && repo) return { owner, repo: repo.replace(/\.git$/, "") };
+  return undefined;
+}
+
+/**
+ * Decide which repo to act on. An explicitly configured `FIX_PR_REPO` is
+ * authoritative — when the operator pins a repo, never let report scraping
+ * override it. Otherwise pull a `github.com/owner/repo` URL out of the report,
+ * then a bare `owner/repo` slug, then fall back to a default.
+ */
 function resolveRepo(report: EscalationReport): { owner: string; repo: string } {
+  const configured = process.env.FIX_PR_REPO?.trim();
+  if (configured) {
+    const pinned = splitSlug(configured);
+    if (pinned) return pinned;
+  }
+
   const haystack = [
     report.suspected_change ?? "",
     ...(report.evidence_links ?? []),
@@ -30,11 +47,10 @@ function resolveRepo(report: EscalationReport): { owner: string; repo: string } 
   const slugMatch = haystack.match(/\b([\w.-]+)\/([\w.-]+)\b/);
   if (slugMatch && slugMatch[1] !== "n") return { owner: slugMatch[1]!, repo: slugMatch[2]! };
 
-  const [owner, repo] = DEFAULT_REPO.split("/");
-  return { owner: owner!, repo: repo ?? "unknown" };
+  return splitSlug(FALLBACK_REPO)!;
 }
 
-function renderEscalationContext(report: EscalationReport): string {
+function renderIncidentContext(report: EscalationReport): string {
   const lines = [
     `Severity: ${report.severity}`,
     `Summary: ${report.summary}`,
@@ -55,20 +71,21 @@ function renderEscalationContext(report: EscalationReport): string {
 }
 
 export const dispatcher: Dispatcher = {
-  name: "suggest-fix-pr",
-  label: "Suggested Fix PR",
+  name: "github",
+  label: "GitHub (issue + fix PR)",
   async dispatch(
     report: EscalationReport,
     ctx: DispatcherContext,
   ): Promise<EscalationOutcome> {
     try {
       const { owner, repo } = resolveRepo(report);
-      const result = await suggestFixPrSubagent.run(
+      const result = await githubSubagent.run(
         {
           owner,
           repo,
+          incident_context: renderIncidentContext(report),
+          severity: report.severity,
           suspected_change: report.suspected_change,
-          escalation_context: renderEscalationContext(report),
         },
         {
           model: ctx.model,
@@ -78,26 +95,29 @@ export const dispatcher: Dispatcher = {
         },
       );
 
-      const pr = result.details?.pr as CreatedPr | undefined;
-      if (!pr) {
+      const { issueUrl, prUrl } = result.details ?? {};
+      if (!issueUrl && !prUrl) {
         return {
-          channel: "suggest-fix-pr",
+          channel: "github",
           status: "skipped",
           summary: result.summary,
         };
       }
+
+      const parts: string[] = [];
+      if (issueUrl) parts.push("issue");
+      if (prUrl) parts.push("draft fix PR");
       return {
-        channel: "suggest-fix-pr",
+        channel: "github",
         status: "delivered",
-        simulated: pr.simulated,
-        summary: `Opened suggested-fix PR #${pr.number} on ${owner}/${repo}.`,
-        ref: pr.url,
+        summary: `Filed ${parts.join(" + ")} on ${owner}/${repo}.`,
+        ref: prUrl ?? issueUrl,
       };
     } catch (err) {
       return {
-        channel: "suggest-fix-pr",
+        channel: "github",
         status: "failed",
-        summary: "Failed to draft the suggested-fix PR.",
+        summary: "Failed to file the GitHub issue / suggested-fix PR.",
         error: err instanceof Error ? err.message : String(err),
       };
     }

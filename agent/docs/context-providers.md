@@ -58,8 +58,8 @@ LLM reasoning — most providers ignore them.
 
 Ship a **stub** now, swap the **real** integration later without touching the
 orchestrator. Put the real call behind a small client interface — the "function
-call schema" — exactly like the subagent stub clients
-(`src/subagents/github-issue/github-client.ts`):
+call schema" — exactly like the dispatcher stub clients
+(`src/escalation/channels/slack/index.ts`):
 
 ```ts
 // the function-call seam

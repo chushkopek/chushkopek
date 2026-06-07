@@ -91,5 +91,7 @@ export async function buildSubagentTools(
   base: SubagentRuntimeBase,
 ): Promise<AgentTool<any>[]> {
   const subagents = await loadSubagents();
-  return subagents.map((s) => subagentTool(s, base));
+  return subagents
+    .filter((s) => s.exposeToParent !== false)
+    .map((s) => subagentTool(s, base));
 }
