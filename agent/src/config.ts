@@ -13,11 +13,14 @@ loadEnv({ quiet: true });
  * Providers we know how to bootstrap from a plain API key in the environment.
  * Ordered by preference when the operator has not pinned one explicitly.
  */
-const SUPPORTED_PROVIDERS = ["anthropic", "openai"] as const;
+const SUPPORTED_PROVIDERS = ["anthropic", "openrouter", "openai"] as const;
 type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
 
 const DEFAULT_MODEL_BY_PROVIDER: Record<SupportedProvider, string> = {
   anthropic: "claude-sonnet-4-5",
+  // OpenRouter routes to Anthropic models by slug. Default to Opus 4.8; switch
+  // with MODEL_ID (e.g. anthropic/claude-sonnet-4.6) or the dev:* npm scripts.
+  openrouter: "anthropic/claude-opus-4.8",
   openai: "gpt-4o",
 };
 
@@ -44,8 +47,9 @@ function detectProvider(): SupportedProvider {
   const detected = SUPPORTED_PROVIDERS.find((p) => Boolean(getEnvApiKey(p)));
   if (!detected) {
     throw new Error(
-      "No provider API key found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY " +
-        "(see .env.example), or pin one with MODEL_PROVIDER + MODEL_ID.",
+      "No provider API key found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or " +
+        "OPENROUTER_API_KEY (see .env.example), or pin one with " +
+        "MODEL_PROVIDER + MODEL_ID.",
     );
   }
   return detected;
@@ -77,6 +81,15 @@ export function loadConfig(): AgentRuntimeConfig {
   }
 
   const model = getModel(provider as KnownProvider, modelId as never);
+  if (!model) {
+    throw new Error(
+      `Unknown model "${modelId}" for provider "${provider}". ` +
+        (provider === "openrouter"
+          ? 'OpenRouter model ids are namespaced, e.g. "anthropic/claude-sonnet-4.5" or "openai/gpt-4o". '
+          : "") +
+        "Set MODEL_ID to a valid id for this provider.",
+    );
+  }
 
   return { provider, model, thinkingLevel: resolveThinkingLevel() };
 }

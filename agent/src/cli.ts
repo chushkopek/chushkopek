@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { attachConsoleRenderer, buildAgent } from "./agent.js";
+import { runOrchestrator } from "./orchestrator/index.js";
 
 const USAGE = `chushkopek — autonomous L1 DevOps on-call agent
 
@@ -49,20 +49,23 @@ async function main(): Promise<void> {
     return;
   }
 
-  const { agent, describe, subagents } = await buildAgent();
-  attachConsoleRenderer(agent);
+  process.stdout.write(`Incident:\n${incident}\n`);
 
-  process.stdout.write(`Model: ${describe}\n`);
-  process.stdout.write(
-    `Subagents: ${subagents.length ? subagents.join(", ") : "(none)"}\n`,
-  );
-  process.stdout.write(`Incident:\n${incident}\n\n--- working ---\n`);
+  const result = await runOrchestrator(incident);
 
-  await agent.prompt(
-    `A production incident has been paged to you. Work it as L1 on-call and ` +
-      `escalate when done.\n\nIncident report:\n${incident}`,
-  );
-  await agent.waitForIdle();
+  process.stdout.write("\n--- escalation outcome ---\n");
+  if (!result.report) {
+    process.stdout.write("No escalation report was produced.\n");
+  } else {
+    if (result.escalationFile) {
+      process.stdout.write(`Handoff written to ${result.escalationFile}\n`);
+    }
+    for (const o of result.outcomes) {
+      const ref = o.ref ? ` → ${o.ref}` : "";
+      const flag = o.simulated ? " (simulated)" : "";
+      process.stdout.write(`  ${o.channel}: ${o.status}${flag}${ref}\n`);
+    }
+  }
 }
 
 main().catch((err) => {

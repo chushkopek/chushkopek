@@ -49,6 +49,50 @@ const EscalationParams = Type.Object({
         "Team or individual best suited to take ownership, if known (e.g. 'payments-oncall').",
     }),
   ),
+  // --- Analysis fields populated from the gathered incident context ---
+  root_cause_hypothesis: Type.Optional(
+    Type.String({
+      description:
+        "The single most likely cause, stated as a falsifiable hypothesis.",
+    }),
+  ),
+  confidence: Type.Optional(
+    Type.Union(
+      [Type.Literal("low"), Type.Literal("medium"), Type.Literal("high")],
+      { description: "Confidence in the root-cause hypothesis." },
+    ),
+  ),
+  traffic_assessment: Type.Optional(
+    Type.Union(
+      [
+        Type.Literal("organic_surge"),
+        Type.Literal("likely_attack"),
+        Type.Literal("inconclusive"),
+      ],
+      {
+        description:
+          "Whether the load looks like organic growth (e.g. Black Friday) or an attack.",
+      },
+    ),
+  ),
+  suspected_change: Type.Optional(
+    Type.String({
+      description:
+        "The deploy/commit/PR most likely responsible, if any (e.g. a sha or PR number).",
+    }),
+  ),
+  evidence_links: Type.Optional(
+    Type.Array(Type.String(), {
+      description:
+        "URLs to dashboards, logs, commits, or PRs that support the findings.",
+    }),
+  ),
+  owner_source: Type.Optional(
+    Type.String({
+      description:
+        "How the suggested owner was derived (e.g. 'CODEOWNERS:/frontend/').",
+    }),
+  ),
 });
 
 export type EscalationReport = Static<typeof EscalationParams>;
@@ -59,7 +103,20 @@ function renderReport(report: EscalationReport): string {
   lines.push("");
   lines.push(`Summary: ${report.summary}`);
   lines.push(`Current state: ${report.current_state}`);
-  if (report.suggested_owner) lines.push(`Suggested owner: ${report.suggested_owner}`);
+  if (report.suggested_owner) {
+    const src = report.owner_source ? ` (${report.owner_source})` : "";
+    lines.push(`Suggested owner: ${report.suggested_owner}${src}`);
+  }
+  if (report.root_cause_hypothesis) {
+    const conf = report.confidence ? ` [confidence: ${report.confidence}]` : "";
+    lines.push(`Root-cause hypothesis: ${report.root_cause_hypothesis}${conf}`);
+  }
+  if (report.traffic_assessment) {
+    lines.push(`Traffic assessment: ${report.traffic_assessment}`);
+  }
+  if (report.suspected_change) {
+    lines.push(`Suspected change: ${report.suspected_change}`);
+  }
   lines.push("");
   lines.push(`Affected systems:`);
   for (const s of report.affected_systems) lines.push(`  - ${s}`);
@@ -76,6 +133,11 @@ function renderReport(report: EscalationReport): string {
   lines.push("");
   lines.push(`Recommended next steps:`);
   for (const step of report.recommended_next_steps) lines.push(`  - ${step}`);
+  if (report.evidence_links?.length) {
+    lines.push("");
+    lines.push(`Evidence:`);
+    for (const link of report.evidence_links) lines.push(`  - ${link}`);
+  }
   return lines.join("\n");
 }
 
