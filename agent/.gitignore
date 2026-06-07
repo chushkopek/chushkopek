@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.log
+
+# Local secrets / runtime config
+.env
+.env.local
+
+# Incident artifacts written at runtime
+escalations/
