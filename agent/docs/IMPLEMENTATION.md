@@ -29,7 +29,9 @@ on query failure; `simulated` dropped.
 
 ## 2. GitHub context — Bojo
 **File:** [src/context/providers/github/index.ts](../src/context/providers/github/index.ts)
-**Replace:** `createStubGithubSource()` → real GitHub REST/GraphQL (reuse the
+**Replace:** `createStubGithubSource()` → real GitHub data via the shared auth +
+sandbox stack in [src/github/](../src/github/) (`mintInstallationToken`) and
+[src/sandbox/](../src/sandbox/) (podman sandbox with authenticated `gh` CLI).
 token-backed client from the gh-access task when it lands).
 **Done when:** returns real recent commits/PRs, the suspected change, and the
 **CODEOWNERS → `resolvedOwner` + `ownerSource`** resolution (the diagram's
