@@ -47,8 +47,9 @@ function detectProvider(): SupportedProvider {
   const detected = SUPPORTED_PROVIDERS.find((p) => Boolean(getEnvApiKey(p)));
   if (!detected) {
     throw new Error(
-      "No provider API key found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY " +
-        "(see .env.example), or pin one with MODEL_PROVIDER + MODEL_ID.",
+      "No provider API key found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or " +
+        "OPENROUTER_API_KEY (see .env.example), or pin one with " +
+        "MODEL_PROVIDER + MODEL_ID.",
     );
   }
   return detected;
@@ -80,6 +81,15 @@ export function loadConfig(): AgentRuntimeConfig {
   }
 
   const model = getModel(provider as KnownProvider, modelId as never);
+  if (!model) {
+    throw new Error(
+      `Unknown model "${modelId}" for provider "${provider}". ` +
+        (provider === "openrouter"
+          ? 'OpenRouter model ids are namespaced, e.g. "anthropic/claude-sonnet-4.5" or "openai/gpt-4o". '
+          : "") +
+        "Set MODEL_ID to a valid id for this provider.",
+    );
+  }
 
   return { provider, model, thinkingLevel: resolveThinkingLevel() };
 }
