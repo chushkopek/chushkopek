@@ -48,25 +48,66 @@ node dist/cli.js "redis latency spiked, checkout timing out"
 
 Escalation handoffs are written to `agent/escalations/` as markdown.
 
+## Orchestration
+
+An incident runs through a deterministic **3-phase pipeline** wrapping an
+agentic core (`src/orchestrator/`):
+
+1. **Gather** — every context provider (`src/context/providers/<name>/`) runs in
+   parallel and returns a typed slice → one `IncidentContext` bundle.
+2. **Analyze** — the L1 agent reasons over the bundle and emits a structured
+   `EscalationReport` (it may pull investigative subagents like `web_search`).
+3. **Dispatch** — every channel (`src/escalation/channels/<name>/`) fans the
+   report out in parallel → Slack, PagerDuty, suggested-fix PR.
+
+Phases 1 and 3 are deterministic (no LLM), so every source is gathered and every
+channel is notified — guarantees, not model decisions. See
+**[docs/orchestration-spec.md](docs/orchestration-spec.md)**.
+
+Context sources and channels are auto-discovered the same way subagents are:
+drop a folder, no shared file to edit. The shipped providers/dispatchers are
+runnable **stubs** behind client interfaces — replace them with real
+integrations without touching the orchestrator
+(**[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** maps the work).
+
 ## Project layout
 
 ```
 src/
-  cli.ts          Entry point: parse the incident, run the agent, stream output
+  cli.ts          Entry point: parse the incident, run the orchestrator
+  orchestrator/   The 3-phase pipeline (gather → analyze → dispatch)
+    index.ts      runOrchestrator()
+    render.ts     IncidentContext → analysis prompt
+    types.ts      IncidentContext, OrchestratorResult
+  context/        Phase 1 — context gathering
+    types.ts      ContextProvider + ProviderSlice contracts
+    registry.ts   Auto-discovery + parallel gatherSlices()
+    providers/    One folder per source (grafana, github, usage, …) — stubs
+  escalation/     Phase 3 — fan-out
+    types.ts      Dispatcher + EscalationOutcome contracts
+    registry.ts   Auto-discovery
+    dispatch.ts   Parallel runDispatch()
+    channels/     One folder per channel (slack, pagerduty, suggest-fix-pr)
   agent.ts        buildAgent() factory (async) + console renderer
   config.ts       Provider/model/thinking resolution from env
   prompts.ts      L1 on-call system prompt (guardrails + operating loop)
   tools/
     index.ts      Core tool registry
-    escalate.ts   Terminal escalation handoff tool
+    escalate.ts   Terminal escalation tool (produces the EscalationReport)
   subagents/      Subagent framework + one folder per subagent
     types.ts      The Subagent contract
     runtime.ts    runLlmSubagent() helper (child agent loop)
     registry.ts   Auto-discovery + subagent->tool wrapper
-    github-issue/ Reference subagent: open a GitHub issue from incident context
+    github-issue/ Reference subagent: open a GitHub issue
+    suggest-fix-pr/ Drafts a fix PR from the escalation context
+    web-search/   Investigative tool the Analyze phase can pull on demand
 docs/
-  subagents.md          How to author a subagent (start here)
-  subagent-template.md  Copy-paste starter
+  orchestration-spec.md  The pipeline flow (start here)
+  IMPLEMENTATION.md      Follow-up: who replaces which stub
+  context-providers.md   How to author/replace a context source
+  dispatchers.md         How to author/replace an escalation channel
+  subagents.md           How to author a subagent
+  subagent-template.md   Copy-paste starter
 ```
 
 ## Subagents

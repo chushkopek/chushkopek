@@ -13,11 +13,14 @@ loadEnv({ quiet: true });
  * Providers we know how to bootstrap from a plain API key in the environment.
  * Ordered by preference when the operator has not pinned one explicitly.
  */
-const SUPPORTED_PROVIDERS = ["anthropic", "openai"] as const;
+const SUPPORTED_PROVIDERS = ["anthropic", "openrouter", "openai"] as const;
 type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
 
 const DEFAULT_MODEL_BY_PROVIDER: Record<SupportedProvider, string> = {
   anthropic: "claude-sonnet-4-5",
+  // OpenRouter routes to Anthropic models by slug. Default to Opus 4.8; switch
+  // with MODEL_ID (e.g. anthropic/claude-sonnet-4.6) or the dev:* npm scripts.
+  openrouter: "anthropic/claude-opus-4.8",
   openai: "gpt-4o",
 };
 
