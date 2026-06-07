@@ -7,6 +7,13 @@ import {
 
 const InputSchema = Type.Object({
   service: Type.String({ description: "The failing service, e.g. 'storefront'." }),
+  service_description: Type.Optional(
+    Type.String({
+      description:
+        "What the service IS and who uses it — copy this from the service-context " +
+        "slice. Grounds the search query. Strongly recommended.",
+    }),
+  ),
   affected_component: Type.Optional(
     Type.String({ description: "The affected part/feature, if known, e.g. 'profile'." }),
   ),
@@ -36,7 +43,10 @@ export const subagent: Subagent<typeof InputSchema, ExternalEventsResult> = {
     "rather than an attack or a single bug. Returns a verdict + cited answer.",
   inputSchema: InputSchema,
   run: async (input: Input, ctx: SubagentContext) => {
-    const result = await investigateExternalEvents(input, ctx);
+    const result = await investigateExternalEvents(
+      { ...input, serviceDescription: input.service_description },
+      ctx,
+    );
     return {
       summary: `external_factor=${result.externalFactor}: ${result.answer}`,
       details: result,

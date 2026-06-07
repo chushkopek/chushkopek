@@ -11,9 +11,12 @@ Look for things like:
 - a freshly-disclosed dependency CVE/advisory or a platform-wide incident.
 
 How to work:
-- Run one or more web searches scoped tightly to the service, the affected
-  component, the symptom, and the time window. Use published_after to focus on
-  recent items when a date is given.
+- GROUND your first search in the service description you are given: search for
+  events/trends relevant to THAT kind of product and its users (e.g. for an
+  e-commerce storefront, look for sales, viral products, shopping holidays), not
+  just the raw error text.
+- Then run further searches scoped to the affected component, the symptom, and
+  the time window. Use published_after to focus on recent items when a date is given.
 - Read results critically; a single hit is not proof.
 - Decide a verdict: "found" (a real external factor plausibly explains it),
   "none" (nothing external found), or "inconclusive" (unclear).

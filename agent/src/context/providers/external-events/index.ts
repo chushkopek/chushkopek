@@ -3,6 +3,11 @@ import {
   investigateExternalEvents,
   type ExternalEventsResult,
 } from "../../../external-events/investigate.js";
+import {
+  createStubServiceCatalog,
+  deriveServiceName,
+  summarizeService,
+} from "../../../service-catalog/index.js";
 
 /**
  * External-events provider (OPT-IN) — the same external-events core as the
@@ -18,11 +23,7 @@ import {
  * gets richer inputs (named affected component) from the analysis.
  */
 
-/** Naive service extraction from trigger text (best-effort at gather time). */
-function deriveService(trigger: string): string {
-  const m = trigger.match(/\b([a-z][a-z0-9-]{2,})\b/i);
-  return m?.[1] ?? "the affected service";
-}
+const catalog = createStubServiceCatalog();
 
 export const provider: ContextProvider<ExternalEventsResult> = {
   name: "external-events",
@@ -31,8 +32,16 @@ export const provider: ContextProvider<ExternalEventsResult> = {
   enabled: () => Boolean(process.env.EXTERNAL_EVENTS_PROVIDER?.trim()),
   async gather(ctx): Promise<ProviderSlice<ExternalEventsResult>> {
     try {
+      // Ground the search in the service profile from the shared catalog (the
+      // provider can't see the service-context slice, so it looks it up too).
+      const service = deriveServiceName(ctx.trigger) ?? "the affected service";
+      const profile = await catalog.lookup(service);
       const result = await investigateExternalEvents(
-        { service: deriveService(ctx.trigger), symptom: ctx.trigger },
+        {
+          service,
+          symptom: ctx.trigger,
+          serviceDescription: profile ? summarizeService(profile) : undefined,
+        },
         ctx,
       );
       return {

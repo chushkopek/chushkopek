@@ -61,8 +61,9 @@ Follow the L1 process over the evidence above:
      upstream/partner outage, advisory) rather than an attack or a code bug.
 4. Rule the external/organic class in or out: when traffic looks organic or
    inconclusive, the symptom is load-shaped, or there is no clear internal change,
-   call the external_events investigator BEFORE concluding. Use web_search for
-   technical reference gaps (CVEs, error signatures).
+   call the external_events investigator BEFORE concluding — pass it the
+   service_description from the service-context slice so its search is grounded in
+   what the service is. Use web_search for technical reference gaps (CVEs, signatures).
 5. Identify the suspected change (deploy/commit/PR) from the GitHub evidence.
 6. Derive the owning team from CODEOWNERS where available.
 

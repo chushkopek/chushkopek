@@ -8,6 +8,13 @@ export interface ExternalEventsInput {
   service: string;
   affected_component?: string;
   symptom: string;
+  /**
+   * A description of what the service IS and who uses it — used to GROUND the
+   * search query (so the first search is about this kind of product/audience,
+   * not just the error). Passed in by the caller; for the demo this is the
+   * hardcoded service-context description.
+   */
+  serviceDescription?: string;
   /** e.g. "last 24h" or an ISO date — guides the search recency. */
   time_window?: string;
   region?: string;
@@ -30,13 +37,18 @@ export interface ExternalEventsResult {
 
 function renderTask(input: ExternalEventsInput): string {
   return [
+    "## The affected service (ground your searches in this)",
+    input.serviceDescription ?? `${input.service} (no description provided)`,
+    "",
+    "## The incident",
     `Service: ${input.service}`,
     input.affected_component ? `Affected component: ${input.affected_component}` : undefined,
     `Symptom: ${input.symptom}`,
     input.time_window ? `Time window: ${input.time_window}` : undefined,
     input.region ? `Region: ${input.region}` : undefined,
     "",
-    "Investigate whether a real-world event/trend could explain this incident as " +
+    "Ground your FIRST search in what this service is and who its users are, then " +
+      "look for a real-world event/trend that could explain this incident as " +
       "organic or externally-caused rather than an attack or a code bug.",
   ]
     .filter((l): l is string => l !== undefined)
