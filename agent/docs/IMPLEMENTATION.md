@@ -29,8 +29,9 @@ on query failure; `simulated` dropped.
 
 ## 2. GitHub context — Bojo
 **File:** [src/context/providers/github/index.ts](../src/context/providers/github/index.ts)
-**Replace:** `createStubGithubSource()` → real GitHub REST/GraphQL (reuse the
-token-backed client from the gh-access task when it lands).
+**Replace:** `createStubGithubSource()` → real GitHub data via the shared auth +
+sandbox stack in [src/github/](../src/github/) (`mintInstallationToken`) and
+[src/sandbox/](../src/sandbox/) (podman sandbox with authenticated `gh` CLI).
 **Done when:** returns real recent commits/PRs, the suspected change, and the
 **CODEOWNERS → `resolvedOwner` + `ownerSource`** resolution (the diagram's
 "service owner resolved via CODEOWNERS"). This owner flows into the escalation
@@ -84,7 +85,10 @@ summary/timeline/next-steps; `ref` is the real permalink.
 **Files:** subagent [src/subagents/suggest-fix-pr/](../src/subagents/suggest-fix-pr/)
 (`github-pr-client.ts`, `tools.ts`, `prompt.ts`, `index.ts`) + the thin adapter
 [src/escalation/channels/suggest-fix-pr/index.ts](../src/escalation/channels/suggest-fix-pr/index.ts).
-**Replace:** `createGitHubPrClient()` stub → real branch + commit + PR creation.
+**Replace:** `createGitHubPrClient()` stub → real branch + commit + PR creation
+via [src/github/](../src/github/) + [src/sandbox/](../src/sandbox/) (sandboxed
+`gh` CLI with a repo-scoped installation token; scope permissions to
+`contents: write` + `pull_requests: write` only).
 **Tune:** `SUGGEST_FIX_PR_PROMPT` so the drafted fix matches your repos.
 **Done when:** a real suggested-fix PR is opened on the failing service's repo,
 drafted from the escalation context (root cause + suspected change). The adapter
@@ -124,8 +128,8 @@ nothing in this layer should need to change.
 cd agent
 npm run typecheck      # contracts line up
 npm run build          # registry .js resolution works
-# full run (needs ANTHROPIC_API_KEY or OPENAI_API_KEY in .env for the Analyze phase):
-echo "storefront readiness probe failing, CrashLoopBackOff in production" | npm run dev
+# full run (needs OPENROUTER_API_KEY or another provider key in .env for Analyze):
+echo "storefront readiness probe failing, CrashLoopBackOff in production" | npm run dev:sonnet
 ```
 
 Expect: 6 Gather lines → the Analyze agent streaming + an `escalate` call → 3
