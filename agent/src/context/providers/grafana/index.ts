@@ -1,4 +1,5 @@
 import type { ContextProvider, ProviderSlice } from "../../types.js";
+import { stubsEnabled } from "../../../stubs.js";
 
 /**
  * Grafana provider — metrics & dashboards around the incident window.
@@ -45,9 +46,9 @@ export const provider: ContextProvider<GrafanaSlice> = {
   name: "grafana",
   label: "Grafana Metrics",
   order: 10,
-  // Stand down when the real context-fetcher is wired in: it supplies the same
-  // Prometheus signals from the live cluster (no contradictory simulated data).
-  enabled: () => !process.env.CONTEXT_FETCHER_URL?.trim(),
+  // Simulated stub. Runs only in demo mode (ENABLE_STUBS=1), and even then
+  // stands down when the real context-fetcher supplies live Prometheus signals.
+  enabled: () => stubsEnabled() && !process.env.CONTEXT_FETCHER_URL?.trim(),
   async gather(ctx): Promise<ProviderSlice<GrafanaSlice>> {
     try {
       const data = await source.query("storefront");

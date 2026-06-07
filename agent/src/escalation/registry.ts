@@ -3,6 +3,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Dispatcher } from "./types.js";
 
+/** Resolve a dispatcher's optional `enabled` flag (default: enabled). */
+function isEnabled(enabled: Dispatcher["enabled"]): boolean {
+  if (enabled === undefined) return true;
+  return typeof enabled === "function" ? enabled() : enabled;
+}
+
 function isDispatcher(value: unknown): value is Dispatcher {
   if (!value || typeof value !== "object") return false;
   const d = value as Partial<Dispatcher>;
@@ -63,6 +69,10 @@ export async function loadDispatchers(): Promise<Dispatcher[]> {
     seen.add(d.name);
   }
 
-  dispatchers.sort((a, b) => a.name.localeCompare(b.name));
-  return dispatchers;
+  // Honor the optional `enabled` flag so a channel can be feature-flagged off
+  // (e.g. the stub Slack/PagerDuty channels outside demo mode).
+  const active = dispatchers.filter((d) => isEnabled(d.enabled));
+
+  active.sort((a, b) => a.name.localeCompare(b.name));
+  return active;
 }

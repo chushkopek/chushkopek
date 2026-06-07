@@ -4,6 +4,7 @@ import {
   deriveServiceName,
   type ServiceProfile,
 } from "../../../service-catalog/index.js";
+import { stubsEnabled } from "../../../stubs.js";
 
 /**
  * Service-context provider — answers "what IS this service, and which part is
@@ -22,6 +23,8 @@ export const provider: ContextProvider<ServiceProfile> = {
   name: "service-context",
   label: "Service Context",
   order: 5, // right after the trigger, framing everything below
+  // Simulated stub (in-code storefront catalog) — only runs in demo mode.
+  enabled: () => stubsEnabled(),
   async gather(ctx): Promise<ProviderSlice<ServiceProfile>> {
     try {
       const service = deriveServiceName(ctx.trigger) ?? "storefront";

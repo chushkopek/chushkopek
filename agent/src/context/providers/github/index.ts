@@ -1,4 +1,5 @@
 import type { ContextProvider, ProviderSlice } from "../../types.js";
+import { stubsEnabled } from "../../../stubs.js";
 
 /**
  * GitHub provider — the affected repo, recent changes, and CODEOWNERS → owner.
@@ -63,6 +64,8 @@ export const provider: ContextProvider<GithubSlice> = {
   name: "github",
   label: "GitHub Repository",
   order: 20,
+  // Simulated stub (hardcoded PR #482 / CODEOWNERS) — only runs in demo mode.
+  enabled: () => stubsEnabled(),
   async gather(ctx): Promise<ProviderSlice<GithubSlice>> {
     try {
       const data = await source.inspect("storefront");

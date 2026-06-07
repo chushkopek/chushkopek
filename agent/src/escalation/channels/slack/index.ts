@@ -1,5 +1,6 @@
 import type { EscalationReport } from "../../../tools/escalate.js";
 import type { Dispatcher, EscalationOutcome } from "../../types.js";
+import { stubsEnabled } from "../../../stubs.js";
 
 /**
  * Slack dispatcher — posts the full incident summary to the incident channel.
@@ -72,6 +73,8 @@ function renderSlackText(report: EscalationReport): string {
 export const dispatcher: Dispatcher = {
   name: "slack",
   label: "Slack Incident Post",
+  // Simulated stub (no real chat.postMessage) — only runs in demo mode.
+  enabled: () => stubsEnabled(),
   async dispatch(report): Promise<EscalationOutcome> {
     try {
       const posted = await slack.postMessage({

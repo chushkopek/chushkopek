@@ -55,6 +55,13 @@ export interface Dispatcher {
   name: string;
   /** Human-readable label for logs/UI. */
   label: string;
+  /**
+   * Whether this channel participates in dispatch. Defaults to enabled. A
+   * function is resolved at dispatch time, so it can read env (e.g. a stub
+   * channel that should only run in demo mode). Optional → existing channels
+   * are unchanged.
+   */
+  enabled?: boolean | (() => boolean);
   /** Deliver the report to this channel. Always resolves; never rejects. */
   dispatch(report: EscalationReport, ctx: DispatcherContext): Promise<EscalationOutcome>;
 }

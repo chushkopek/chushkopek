@@ -1,4 +1,5 @@
 import type { ContextProvider, ProviderSlice } from "../../types.js";
+import { stubsEnabled } from "../../../stubs.js";
 
 /**
  * Kubernetes provider — pod status, restart reasons, events, current rollout.
@@ -53,9 +54,9 @@ export const provider: ContextProvider<KubernetesSlice> = {
   name: "kubernetes",
   label: "Kubernetes State",
   order: 50,
-  // Stand down when the real context-fetcher is wired in: it supplies live pod
-  // state, events, and rollout image from the cluster (no contradictory stub).
-  enabled: () => !process.env.CONTEXT_FETCHER_URL?.trim(),
+  // Simulated stub. Runs only in demo mode (ENABLE_STUBS=1), and even then
+  // stands down when the real context-fetcher supplies live cluster state.
+  enabled: () => stubsEnabled() && !process.env.CONTEXT_FETCHER_URL?.trim(),
   async gather(ctx): Promise<ProviderSlice<KubernetesSlice>> {
     try {
       const data = await source.inspect("storefront", "production");
