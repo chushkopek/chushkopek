@@ -1,14 +1,15 @@
+import { join } from "node:path";
 import { Type, type Static } from "@earendil-works/pi-ai";
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
 import type { Subagent, SubagentContext, SubagentResult } from "../types.js";
 import { runLlmSubagent } from "../runtime.js";
 import { GITHUB_PROMPT } from "./prompt.js";
-import { PodmanSandbox, createBashTool } from "../../sandbox/index.js";
+import { createSandbox, createBashTool } from "../../sandbox/index.js";
+import type { BashToolDetails } from "../../sandbox/index.js";
 import {
   loadGitHubAppConfigFromEnv,
   mintInstallationToken,
 } from "../../github/index.js";
-import type { BashToolDetails } from "../../sandbox/index.js";
 
 const InputSchema = Type.Object({
   owner: Type.String({ description: "Target repository owner (user or org)." }),
@@ -47,13 +48,12 @@ interface Details {
 }
 
 const DEFAULT_SANDBOX_IMAGE = "docker.io/maniator/gh:latest";
-const REPO_DIR = "/tmp/repo";
 const ISSUE_URL_RE = /https?:\/\/\S+?\/issues\/\d+/;
 const PR_URL_RE = /https?:\/\/\S+?\/pull\/\d+/;
 const BOT_NAME = "chushkopek-agent[bot]";
 const BOT_EMAIL = "chushkopek-agent@users.noreply.github.com";
 
-function renderTask(input: Input, checkoutAvailable: boolean): string {
+function renderTask(input: Input, repoDir: string, checkoutAvailable: boolean): string {
   const lines = [
     `Repository: ${input.owner}/${input.repo}`,
     `Base branch: ${input.base ?? "main"}`,
@@ -65,7 +65,7 @@ function renderTask(input: Input, checkoutAvailable: boolean): string {
       ? `Suspected change: ${input.suspected_change}`
       : undefined,
     checkoutAvailable
-      ? `A checkout is available at ${REPO_DIR} (your shell starts there). A suggested-fix PR is allowed if applicable.`
+      ? `A checkout is available at ${repoDir} (your shell starts there). A suggested-fix PR is allowed if applicable.`
       : "No checkout is available — file the issue only; do NOT attempt a PR.",
     "",
     "Incident context:",
@@ -76,9 +76,9 @@ function renderTask(input: Input, checkoutAvailable: boolean): string {
 
 /**
  * Subagent: act on an incident in a target repo via the `gh` CLI inside a
- * podman sandbox. It always files a well-structured issue and, when the context
- * clearly implies a concrete low-risk fix, opens a DRAFT suggested-fix PR from a
- * real checkout of the repo.
+ * sandbox (podman when available, otherwise the host shell). It always files a
+ * well-structured issue and, when the context clearly implies a concrete
+ * low-risk fix, opens a DRAFT suggested-fix PR from a real checkout of the repo.
  *
  * Instead of hand-rolling REST calls, it clones the repo into the sandbox and
  * hands the model a `bash` tool pinned to the checkout root, where `gh`/`git`
@@ -98,7 +98,8 @@ export const subagent: Subagent<typeof InputSchema, Details> = {
     "low-risk fix is implied, opens a draft suggested-fix PR in a target " +
     "repository from incident context. Provide owner, repo, and the incident " +
     "details; it returns the created issue and PR URLs. Requires a configured " +
-    "GitHub App (see .env) and podman.",
+    "GitHub App (see .env). Uses podman when available; otherwise runs gh/git " +
+    "on the host.",
   inputSchema: InputSchema,
   run: async (input: Input, ctx: SubagentContext): Promise<SubagentResult<Details>> => {
     const appConfig = await loadGitHubAppConfigFromEnv();
@@ -125,7 +126,7 @@ export const subagent: Subagent<typeof InputSchema, Details> = {
     const image =
       process.env.GITHUB_SANDBOX_IMAGE?.trim() || DEFAULT_SANDBOX_IMAGE;
 
-    const sandbox = await PodmanSandbox.start({
+    const { sandbox, mode } = await createSandbox({
       image,
       // A clone needs more scratch than the default 64m tmpfs.
       tmpfsSize: "512m",
@@ -145,6 +146,11 @@ export const subagent: Subagent<typeof InputSchema, Details> = {
         GIT_COMMITTER_EMAIL: BOT_EMAIL,
       },
     });
+    if (mode === "raw") {
+      console.info("[github] podman unavailable; using host shell for gh/git.");
+    }
+
+    const repoDir = join(sandbox.scratchDir, "repo");
 
     try {
       // Deterministically position the subagent inside a checkout of the repo so
@@ -154,10 +160,10 @@ export const subagent: Subagent<typeof InputSchema, Details> = {
       const setup = await sandbox.exec(
         [
           "gh auth setup-git",
-          `gh repo clone "$GH_REPO" ${REPO_DIR} -- --depth 1 --branch ${base} || gh repo clone "$GH_REPO" ${REPO_DIR} -- --depth 1`,
-          `git config --global --add safe.directory ${REPO_DIR}`,
-          `git -C ${REPO_DIR} config user.name "${BOT_NAME}"`,
-          `git -C ${REPO_DIR} config user.email "${BOT_EMAIL}"`,
+          `gh repo clone "$GH_REPO" ${repoDir} -- --depth 1 --branch ${base} || gh repo clone "$GH_REPO" ${repoDir} -- --depth 1`,
+          `git config --global --add safe.directory ${repoDir}`,
+          `git -C ${repoDir} config user.name "${BOT_NAME}"`,
+          `git -C ${repoDir} config user.email "${BOT_EMAIL}"`,
         ].join(" && "),
       );
       const checkoutAvailable = setup.exitCode === 0;
@@ -197,10 +203,10 @@ export const subagent: Subagent<typeof InputSchema, Details> = {
         systemPrompt: GITHUB_PROMPT,
         tools: [
           createBashTool(sandbox, {
-            workdir: checkoutAvailable ? REPO_DIR : undefined,
+            workdir: checkoutAvailable ? repoDir : undefined,
           }),
         ],
-        task: renderTask(input, checkoutAvailable),
+        task: renderTask(input, repoDir, checkoutAvailable),
       });
 
       if (llmError) {
@@ -225,7 +231,7 @@ export const subagent: Subagent<typeof InputSchema, Details> = {
     } finally {
       await sandbox.close().catch((err: unknown) => {
         console.warn(
-          `[github] failed to remove sandbox container: ${
+          `[github] failed to tear down sandbox: ${
             err instanceof Error ? err.message : String(err)
           }`,
         );
